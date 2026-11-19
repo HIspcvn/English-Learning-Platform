@@ -1,0 +1,110 @@
+name: Sprint 00 quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      DATABASE_URL: postgresql+psycopg://elp:elp_local_only@127.0.0.1:15432/elp
+      TEST_DATABASE_URL: postgresql+psycopg://elp:elp_local_only@127.0.0.1:15432/elp_test
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          version: "0.12.7"
+          enable-cache: true
+          cache-dependency-glob: apps/api/uv.lock
+
+      - name: Install locked dependencies
+        run: |
+          npm ci --no-audit --no-fund
+          uv sync --locked --project apps/api
+
+      - name: Start disposable PostgreSQL
+        run: |
+          docker compose --env-file .env.example config --quiet
+          docker compose --env-file .env.example up --detach --wait db
+          docker compose --env-file .env.example exec -T db createdb -U elp elp_test
+
+      - name: Check migration and backend tests
+        working-directory: apps/api
+        run: |
+          uv run --locked ruff check .
+          uv run --locked ruff format --check .
+          uv run --locked alembic upgrade head
+          uv run --locked alembic check
+          uv run --locked python -m pytest --junitxml=../../test-results/api-junit.xml
+
+      - name: Check generated contracts
+        run: |
+          (cd apps/api && uv run --locked python -m app.export_openapi --output openapi.json)
+          npm run api:types
+          git diff --exit-code -- apps/api/openapi.json apps/web/lib/api/schema.d.ts
+
+      - name: Check frontend
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test:web
+          npm run build
+
+      - name: Build and run the Compose stack
+        run: docker compose --env-file .env.example up --build --detach --wait --wait-timeout 120
+
+      - name: Run browser smoke tests
+        env:
+          PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+        run: |
+          npm exec --workspace @elp/web -- playwright install --with-deps chromium
+          npm run test:e2e
+
+      - name: Check the API with PostgreSQL stopped
+        run: |
+          docker compose --env-file .env.example stop db
+          status=$(curl -sS --max-time 10 -o /tmp/elp-readiness.json -w '%{http_code}' http://127.0.0.1:8000/health/ready)
+          test "$status" = "503"
+          curl --fail --silent --show-error --max-time 10 http://127.0.0.1:8000/health/live
+
+      - name: Scan Git history for secrets
+        run: |
+          docker run --rm --network none --mount "type=bind,source=$PWD,target=/repo,readonly" \
+            --env GIT_CONFIG_COUNT=1 --env GIT_CONFIG_KEY_0=safe.directory --env GIT_CONFIG_VALUE_0=/repo \
+            ghcr.io/gitleaks/gitleaks:v8.30.0 git --redact --no-banner /repo
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sprint-00-test-evidence
+          path: |
+            test-results/api-junit.xml
+            apps/web/playwright-report
+            apps/web/test-results
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Stop the Compose stack
+        if: always()
+        run: docker compose --env-file .env.example down
