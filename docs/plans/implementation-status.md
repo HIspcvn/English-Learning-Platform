@@ -18,7 +18,7 @@
 | [S00-01](sprint-00.md#s00-01--chốt-adr-và-hợp-đồng) Chốt ADR và hợp đồng | Blueprint | DONE | `main`, `1496fa1`. Kiểm 49 tài liệu Markdown, 618 liên kết nội bộ, 49 dòng parity, 73 mã QA. [Bằng chứng](../testing/04-sprint-00-verification.md) |
 | [S00-02](sprint-00.md#s00-02--khởi-tạo-môi-trường-chạy) Khởi tạo môi trường chạy | S00-01 | DONE | `main`, `08eecc2`. Clone sạch, Compose healthy, PostgreSQL 17 upgrade/check/downgrade và readiness phục hồi sau khi khởi động lại DB. [Bằng chứng](../testing/04-sprint-00-verification.md) |
 | [S00-03](sprint-00.md#s00-03--dựng-ci-và-test-harness) Dựng CI và test harness | S00-02 | BLOCKED | `main`, `9526ba2`. Local đạt 10 API, 4 unit web, 4 Playwright cùng kiểm tra OpenAPI, Actionlint và Gitleaks. Cổng GitHub Actions còn chờ bằng chứng hosted. Nghiệm thu local đáp ứng điều kiện mở S01-01. [Bằng chứng](../testing/04-sprint-00-verification.md) |
-| [S01-01](sprint-01.md#s01-01--tạo-danh-tính-và-vòng-đời-token) Danh tính email và xác minh | S00-03 (nền local) | IN_PROGRESS | `feat/sprint-01-auth-onboarding`, nền `9574c8776cca`. Commit và kết quả nghiệm thu cập nhật sau khi thực thi. |
+| [S01-01](sprint-01.md#s01-01--tạo-danh-tính-và-vòng-đời-token) Danh tính email và xác minh | S00-03 (nền local) | DONE | `feat/sprint-01-auth-onboarding`, schema `69c1209`, identity/worker `c5b75d6`, API `859965e`, Compose/CI `c766827`. 50 pytest, 4 unit web, 4 Playwright, HTTP/Mailpit và Compose đạt. [Bằng chứng](../testing/05-sprint-01-email-identity-verification.md) |
 | [S01-02](sprint-01.md#s01-02--phiên-và-quyền-truy-cập) Phiên và quyền truy cập | S01-01 | NOT_STARTED | — |
 | [S01-03](sprint-01.md#s01-03--onboarding-và-settings-an-toàn) Onboarding và settings | S01-02 | NOT_STARTED | — |
 | [S01-04](sprint-01.md#s01-04--yêu-cầu-xuất-và-xóa-dữ-liệu) Xuất và xóa dữ liệu | S01-01, S01-02, S01-03 | NOT_STARTED | — |
@@ -75,5 +75,5 @@ Chạy S12-01 và S12-02 cho từng release. Ghi kết quả và lệnh rollback
 
 - **S00-03 hosted** — Cần lần chạy GitHub Actions thực tế để xác nhận cổng PR. Kiểm tra connector cho commit nền trả về danh sách PR workflow và commit status rỗng. Kết quả local của Sprint 00 đã được lưu. [Workflow](../../.github/workflows/ci.yml) · [Bằng chứng](../testing/04-sprint-00-verification.md#cổng-bàn-giao)
 - **Staging và production** — Trước pilot cần chốt hosting, vùng dữ liệu, domain, ngân sách, backup/restore và điều kiện privacy. Trước gửi thư staging cần chốt nhà cung cấp email và sender DNS. [Các quyết định cần chốt](00-master-roadmap.md#các-quyết-định-cần-chốt) · [ADR HTTP và triển khai](../architecture/adr/0002-http-and-deployment-baseline.md)
-- **Hiện tại** — Thực thi S01-01 và lưu kết quả nghiệm thu lifecycle trên PostgreSQL và Mailpit. [Sprint 01](sprint-01.md#s01-01--tạo-danh-tính-và-vòng-đời-token)
-- **Next task** — S01-02 bắt đầu khi S01-01 đạt Definition of Done. Tiếp tục theo phụ thuộc S01-03 và S01-04. [Kế hoạch phiên và quyền truy cập](sprint-01.md#s01-02--phiên-và-quyền-truy-cập)
+- **Hiện tại** — S01-01 đã đạt nghiệm thu local. Commit và bằng chứng sẵn sàng review. [Bằng chứng](../testing/05-sprint-01-email-identity-verification.md)
+- **Next task** — S01-02 có thể bắt đầu với user active, Argon2id và bootstrap CSRF guest. Tiếp tục S01-03 và S01-04 theo phụ thuộc. [Kế hoạch phiên và quyền truy cập](sprint-01.md#s01-02--phiên-và-quyền-truy-cập)

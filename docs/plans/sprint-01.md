@@ -1,6 +1,6 @@
 # Sprint 01 — Xác thực và onboarding
 
-> PROPOSED · MVP · Các đường dẫn code bên dưới là vị trí dự kiến.
+> MVP · S01-01 đã đạt nghiệm thu local. [Tiến độ thực thi](implementation-status.md)
 
 ## Mục tiêu và phạm vi
 
@@ -37,9 +37,9 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 - **Nghiệm thu** Hai lần đăng ký cùng email không tạo hai user hoặc thay thông tin đăng nhập. Chỉ link hợp lệ chứng minh email mới thiết lập được credential lần đầu.
 - **Commit đề xuất** `feat: add email identity lifecycle`.
 
-- [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
-- [ ] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
-- [ ] Gửi thay đổi và bằng chứng chạy kiểm thử để review.
+- [x] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
+- [x] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
+- [x] Bàn giao commit local và [bằng chứng chạy kiểm thử](../testing/05-sprint-01-email-identity-verification.md) để review.
 
 ### S01-02 — Phiên và quyền truy cập
 
