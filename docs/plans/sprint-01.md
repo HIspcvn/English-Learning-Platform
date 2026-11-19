@@ -1,6 +1,6 @@
 # Sprint 01 — Xác thực và onboarding
 
-> MVP · S01-01 đã đạt nghiệm thu local. [Tiến độ thực thi](implementation-status.md)
+> MVP · S01-01 đã đạt CI hosted. S01-02 đã đạt nghiệm thu local. [Tiến độ thực thi](implementation-status.md)
 
 ## Mục tiêu và phạm vi
 
@@ -54,9 +54,10 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 - **Nghiệm thu** Request ghi thiếu CSRF bị chặn và mọi lỗi phiên về form login thân thiện.
 - **Commit đề xuất** `feat: secure session and auth routes`.
 
-- [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
-- [ ] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
-- [ ] Gửi thay đổi và bằng chứng chạy kiểm thử để review.
+- [x] Viết ca kiểm thử và xác nhận lỗi đặc trưng trước khi có endpoint và trước bản sửa timing.
+- [x] Hoàn thành đầu ra, chạy PostgreSQL riêng, Playwright qua Compose và đối chiếu nghiệm thu.
+- [x] Bàn giao commit local và bằng chứng chạy kiểm thử để review. [Kế hoạch](tasks/S01-02-secure-sessions.md) · [Bằng chứng](../testing/06-sprint-01-secure-sessions-verification.md)
+- [ ] Chạy CI hosted cho SHA S01-02 được gửi review.
 
 ### S01-03 — Onboarding và settings an toàn
 

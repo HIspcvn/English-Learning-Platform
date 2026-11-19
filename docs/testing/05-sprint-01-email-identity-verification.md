@@ -53,4 +53,4 @@ Smoke HTTP cần giữ cookie từ `GET /api/v1/auth/session`. Gửi `POST /api/
 
 ## Bàn giao
 
-S01-01 đạt nghiệm thu local. S01-02 có thể dùng danh tính active và bootstrap guest để triển khai phiên. Login, giao diện xác minh và onboarding thuộc các task sau. GitHub Actions hosted, review trên remote, SMTP production và cổng phát hành còn chờ các mốc tương ứng. [Tracker](../plans/implementation-status.md)
+S01-01 đạt nghiệm thu local. S01-02 dùng danh tính active và bootstrap guest để triển khai phiên. GitHub Actions `verify` đã PASS cho SHA `a92a9f2`. PR #1 được merge vào `main` tại `6e6d1c4` và workflow sau merge cũng PASS. SMTP production và cổng phát hành còn chờ các mốc tương ứng. [Tracker](../plans/implementation-status.md) · [Run PR](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44507218765) · [Run main](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44508335891)

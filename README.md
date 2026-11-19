@@ -76,7 +76,7 @@ Invoke-RestMethod http://127.0.0.1:3000/health/ready
 
 With the default ports, open the local web app at `http://127.0.0.1:3000/`. The OpenAPI document is at `http://127.0.0.1:3000/api/v1/openapi.json`. Run `docker compose down` to stop the stack and retain the database volume.
 
-Open Mailpit at `http://127.0.0.1:8025/`. To test email verification without the future verification screen, get `GET /api/v1/auth/session` through the web origin and keep its cookie. Include that origin and the returned `csrf_token` in the `Origin` and `X-CSRF-Token` headers on auth POSTs. Register a synthetic address, then take the token from the Mailpit link fragment and send it as JSON with `password` and `display_name` to `/api/v1/auth/verify`. A `204` confirms activation. See the [S01-01 plan](docs/plans/tasks/S01-01-email-identity.md).
+Open `/register` and enter a synthetic email address. In Mailpit at `http://127.0.0.1:8025/`, open the verification link, set a display name and password, then sign in. Use `/forgot-password` to test recovery through a second Mailpit message. The protected onboarding and dashboard destinations show session status until their planned features are implemented. [S01-02 plan](docs/plans/tasks/S01-02-secure-sessions.md)
 
 ## Environment Configuration
 
@@ -88,12 +88,13 @@ Use [`.env.example`](.env.example) as the template for your local `.env`. Keep d
 | `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` | Set loopback host ports. Defaults are `15432`, `8000`, and `3000`, respectively. |
 | `DATABASE_URL` | SQLAlchemy connection URL with the `postgresql+psycopg://` scheme. Compose sets it for the API and migration services. Set it in the API terminal when running directly on the host. |
 | `TEST_DATABASE_URL` | Connection URL for a disposable PostgreSQL database used by integration tests. |
-| `AUTH_PUBLIC_ORIGIN` | Exact browser origin for guest auth and mail links. Compose derives it from `WEB_PORT` by default. HTTP is available for loopback development. |
-| `AUTH_MAIL_KEY`, `AUTH_MAIL_KEY_ID` | Base64-encoded 32-byte local mail key and its identifier. Store in the local environment or ignored `.env`. Drain queued verification mail before rotating the local key. |
+| `AUTH_PUBLIC_ORIGIN` | Exact browser origin for auth, cookie security and mail links. Compose derives it from `WEB_PORT` by default. HTTP is available for loopback development. |
+| `AUTH_MAIL_KEY`, `AUTH_MAIL_KEY_ID` | Base64-encoded 32-byte local mail key and its identifier. Store in the local environment or ignored `.env`. Drain queued authentication mail before rotating the local key. |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_SENDER` | Worker delivery configuration. Compose uses the internal Mailpit service. Host development defaults to `127.0.0.1:1025` and a reserved sender address. |
 | `MAILPIT_WEB_PORT`, `MAILPIT_SMTP_PORT` | Local Mailpit ports. Defaults are `8025` and `1025`. |
 | `API_INTERNAL_URL` | API origin used by Next.js rewrites. Set it before starting the dev server or building the web app if the host API runs outside the default origin `http://127.0.0.1:8000`. Use an origin without credentials or a path. |
 | `PLAYWRIGHT_BASE_URL` | Web origin for tests against a running stack. Set it explicitly when testing Compose. |
+| `PLAYWRIGHT_MAILPIT_URL` | Mailpit HTTP origin for the browser authentication tests. Only use a disposable mail sink and synthetic addresses. |
 
 ## Development Commands
 
@@ -130,6 +131,7 @@ npm.cmd run test:web
 npm.cmd run build
 npm.cmd exec --workspace @elp/web -- playwright install chromium
 $env:PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:3000'
+$env:PLAYWRIGHT_MAILPIT_URL = 'http://127.0.0.1:8025'
 npm.cmd run test:e2e
 ```
 
@@ -176,4 +178,4 @@ Follow the [implementation tracker](docs/plans/implementation-status.md) for tas
 
 ## Current Project Status
 
-The current implementation supports a responsive home page with API connectivity and retry, database-aware readiness, schema migrations, generated API types, and the guest email verification workflow. Login, learner sessions, and the verification screen are scheduled in Sprint 01.
+The current implementation supports a responsive home page, database-aware readiness, generated API types, email registration and verification, cookie-based learner sessions, and password recovery. Learner onboarding and preferences are planned for S01-03.
