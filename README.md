@@ -1,10 +1,68 @@
 # English Learning Platform
 
-Bộ tài liệu nghiên cứu AIO English và monorepo của nền tảng web học tiếng Anh dành cho người nói tiếng Việt. Sprint 00 cung cấp ứng dụng Next.js, API FastAPI, PostgreSQL, migration nền và kiểm tra CI. Tên sản phẩm làm việc là Nhịp Anh.
+**Structured English practice for learners in Vietnam.**
 
-## Chạy từ checkout mới
+## Project Overview
 
-Yêu cầu Docker Engine với Compose v2+, Node.js 24 với npm 11, Python 3.13 và uv 0.12.7. Mở terminal tại thư mục repo. Các lệnh PowerShell dùng `npm.cmd`; trên Linux/macOS dùng `npm`.
+English Learning Platform is an independent web application being built for people in Vietnam who want to improve their English through regular, guided practice. The planned study flow will help learners choose their next lesson, act on feedback, and revisit material when it is due for review.
+
+The repository currently contains a runnable development foundation. The web home page checks its connection to the API, and the local stack provides database migrations, health checks, and automated tests. Learner accounts, lessons, and progress tracking are planned.
+
+## Product Vision
+
+Help learners build a sustainable study habit through short, mobile-friendly sessions, Vietnamese guidance, and a progression aligned with the Common European Framework of Reference for Languages (CEFR). The initial path starts at A1. Practice feedback, saved progress, and scheduled review will help learners decide what to work on next.
+
+## Key Features
+
+All learning capabilities below are **planned**. The implemented foundation is listed under [Current Project Status](#current-project-status).
+
+| Capability | Target experience | Milestone |
+| --- | --- | --- |
+| Structured learning roadmaps | Follow an A1 path organized into courses, units, and lessons, with higher levels added as content is approved. | MVP |
+| Interactive sentence typing | Type words, phrases, and sentences, see targeted feedback, and resume a lesson at the selected difficulty. | MVP |
+| Vocabulary and flashcards | Study curated decks and keep vocabulary from completed lessons in a personal collection. | MVP |
+| Spaced repetition | Opt vocabulary into scheduled review and rate how well it was recalled. | MVP |
+| Personalized learning dashboard | Resume the next lesson, set a daily study goal, and see due reviews. | MVP |
+| Learning progress tracking | Record lesson completion, study activity, and practice results across sessions. | MVP |
+| Content management system | Import and edit lessons, review them, and publish versioned content. | MVP |
+| Grammar practice | Read explanations and apply them in exercises with feedback. | V1 |
+| Reading and translation | Read bilingual texts and practice translating against curated references and rubrics. | V1 |
+| Listening and video learning | Practice with audio and video lessons, synchronized captions, and quizzes where available. | V1 |
+| Dictation and shadowing | Transcribe short clips and compare locally recorded speech with a model. | V1 |
+| Pronunciation practice | Study IPA sounds and use audio examples and minimal-pair listening exercises. | V1 |
+| AI-powered learning assistance | Request opt-in feedback on supported activities, subject to quality and privacy checks. | V2 |
+
+## Technology Stack
+
+| Layer | Technologies in the repository |
+| --- | --- |
+| Web | Next.js App Router, React, TypeScript, Tailwind CSS, Node.js 24, npm 11 workspaces |
+| API | Python 3.13, FastAPI, Pydantic, SQLAlchemy, psycopg, uv |
+| Database | PostgreSQL 17 and Alembic |
+| API contracts | OpenAPI 3.1 and generated TypeScript types |
+| Testing and automation | pytest, Ruff, ESLint, Node.js test runner, Playwright, Docker Compose, GitHub Actions |
+
+## System Architecture
+
+The monorepo contains a Next.js frontend and a single FastAPI service backed by PostgreSQL. The browser calls the API through the web origin. Next.js forwards operational health checks and requests under `/api/v1/` to FastAPI. Docker Compose starts PostgreSQL, applies migrations, then starts the API and web services.
+
+The API exposes `/health/live` for process liveness, `/health/ready` for database connectivity and the expected Alembic revision, and `/api/v1/openapi.json` for the current API contract. The target architecture organizes future product domains within a modular monolith. [Architecture overview](docs/architecture/01-system-architecture.md)
+
+## Project Structure
+
+```text
+apps/
+  web/                 Next.js application, generated API types, and web tests
+  api/                 FastAPI application, Alembic migrations, and API tests
+docs/                  Product requirements, architecture, roadmap, and test plans
+.github/workflows/     GitHub Actions workflow
+compose.yaml           Local PostgreSQL, migration, API, and web services
+.env.example           Local Compose configuration template
+```
+
+## Getting Started
+
+Install Docker Engine with Docker Compose v2 or later. For host-side development and testing, install Node.js 24 with npm 11, Python 3.13, and uv 0.12.7. Run the commands from the repository root. The examples use PowerShell. On Linux and macOS, use `npm` in place of `npm.cmd` and adapt the shell syntax for environment variables.
 
 ```powershell
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
@@ -14,12 +72,50 @@ Invoke-RestMethod http://127.0.0.1:3000/health/live
 Invoke-RestMethod http://127.0.0.1:3000/health/ready
 ```
 
-Mở [Web local](http://127.0.0.1:3000/) và [OpenAPI local](http://127.0.0.1:3000/api/v1/openapi.json). Compose chờ PostgreSQL, chạy Alembic một lần, rồi mở API và Web. Các cổng host mặc định DB 15432, API 8000 và Web 3000 cấu hình được trong `.env`. API kết nối các service qua cổng nội bộ Compose. Dùng mật khẩu thuần URL-safe trong Compose local. Giá trị mẫu chỉ dành cho máy dev hoặc CI.
+With the default ports, open the local web app at `http://127.0.0.1:3000/`. The OpenAPI document is at `http://127.0.0.1:3000/api/v1/openapi.json`. Run `docker compose down` to stop the stack and retain the database volume.
 
-### Chạy kiểm tra
+## Environment Configuration
+
+Use [`.env.example`](.env.example) as the template for your local `.env`. Keep database credentials in local configuration. Use a URL-safe PostgreSQL password for the Compose setup.
+
+| Setting | Purpose |
+| --- | --- |
+| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Configure the local PostgreSQL service. |
+| `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` | Set loopback host ports. Defaults are `15432`, `8000`, and `3000`, respectively. |
+| `DATABASE_URL` | SQLAlchemy connection URL with the `postgresql+psycopg://` scheme. Compose sets it for the API and migration services. Set it in the API terminal when running directly on the host. |
+| `TEST_DATABASE_URL` | Connection URL for a disposable PostgreSQL database used by integration tests. |
+| `API_INTERNAL_URL` | API origin used by Next.js rewrites. Set it before starting the dev server or building the web app if the host API runs outside the default origin `http://127.0.0.1:8000`. Use an origin without credentials or a path. |
+| `PLAYWRIGHT_BASE_URL` | Web origin for tests against a running stack. Set it explicitly when testing Compose. |
+
+## Development Commands
+
+For host-side development, stop the Compose web and API services to free their ports, leave PostgreSQL running, and install the frontend dependencies.
 
 ```powershell
+docker compose stop web api
+docker compose up --detach --wait db
 npm.cmd ci
+```
+
+In an API terminal, load the PostgreSQL settings from `.env` and apply migrations before starting Uvicorn. The parser below assumes the simple `KEY=VALUE` format used by the template.
+
+```powershell
+$db = Get-Content -Raw -LiteralPath .env | ConvertFrom-StringData
+$dbOrigin = "postgresql+psycopg://$($db.POSTGRES_USER):$($db.POSTGRES_PASSWORD)@127.0.0.1:$($db.POSTGRES_PORT)"
+$env:DATABASE_URL = "$dbOrigin/$($db.POSTGRES_DB)"
+Set-Location apps/api
+uv sync --locked
+uv run --locked alembic upgrade head
+uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
+```
+
+In a separate terminal at the repository root, run `npm.cmd run dev`.
+
+## Testing & Quality Assurance
+
+Run the frontend checks from the repository root after `npm.cmd ci`. Start the Compose stack before the browser tests. Adjust the base URL if you changed the web port.
+
+```powershell
 npm.cmd run lint
 npm.cmd run typecheck
 npm.cmd run test:web
@@ -29,12 +125,14 @@ $env:PLAYWRIGHT_BASE_URL = 'http://127.0.0.1:3000'
 npm.cmd run test:e2e
 ```
 
-Với cấu hình Compose mặc định, tạo một DB test riêng tên `elp_test` một lần rồi chạy lệnh backend sau. Khi đổi thông tin hoặc cổng PostgreSQL local, sửa các DSN tương ứng. Chỉ dùng `TEST_DATABASE_URL` với DB test cô lập vì bộ kiểm tra chạy migration lên và xuống.
+For the backend suite, run the following from the repository root with the database service running. Create `elp_test` once and use a disposable test database because the suite applies and reverses migrations.
 
 ```powershell
-docker compose exec -T db createdb -U elp elp_test
-$env:DATABASE_URL = 'postgresql+psycopg://elp:elp_local_only@127.0.0.1:15432/elp'
-$env:TEST_DATABASE_URL = 'postgresql+psycopg://elp:elp_local_only@127.0.0.1:15432/elp_test'
+$db = Get-Content -Raw -LiteralPath .env | ConvertFrom-StringData
+$dbOrigin = "postgresql+psycopg://$($db.POSTGRES_USER):$($db.POSTGRES_PASSWORD)@127.0.0.1:$($db.POSTGRES_PORT)"
+docker compose exec -T db createdb -U $db.POSTGRES_USER elp_test
+$env:DATABASE_URL = "$dbOrigin/$($db.POSTGRES_DB)"
+$env:TEST_DATABASE_URL = "$dbOrigin/elp_test"
 Push-Location apps/api
 uv sync --locked
 uv run --locked ruff check .
@@ -48,96 +146,26 @@ npm.cmd run api:types
 git diff --exit-code -- apps/api/openapi.json apps/web/lib/api/schema.d.ts
 ```
 
-Để chuyển từ Compose sang hai process dev trực tiếp, chạy `docker compose stop web api` để giải phóng cổng, rồi giữ PostgreSQL với `docker compose up --detach --wait db` và chạy migration ở trên. Terminal API trong `apps/api` chạy `uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log` sau khi đặt `DATABASE_URL`. Terminal frontend chạy `npm.cmd run dev` ở root. Nếu cổng API khác 8000, đặt `API_INTERNAL_URL` trước khi chạy Next dev hoặc build. Dừng stack bằng `docker compose down`, volume PostgreSQL giữ dữ liệu local.
+Recorded local verification covers 10 backend tests, 4 web unit tests, and 4 Playwright smoke tests. The GitHub Actions workflow defines quality checks for pushes and pull requests. [Local verification record](docs/testing/04-sprint-00-verification.md) · [CI workflow](.github/workflows/ci.yml)
 
-[Bằng chứng chạy Sprint 00](docs/testing/04-sprint-00-verification.md) · [Cấu hình CI](.github/workflows/ci.yml)
+## Development Roadmap
 
-## Bắt đầu đọc
+| Milestone | Scope | Status |
+| --- | --- | --- |
+| Development foundation | Local stack, baseline migration, API contracts, and automated checks | Implemented |
+| MVP | Email verification and onboarding, A1 curriculum, core practice and review flows, and editorial publishing | Planned |
+| V1 | Additional language skills, bilingual content, and media-based practice | Planned |
+| V2 | Opt-in AI feedback and expanded personalization | Planned |
 
-1. Mở [Tổng quan khảo sát](docs/research/01-site-exploration.md) để xem số trang, khu vực, tính năng và giới hạn nghiên cứu.
-2. Đọc [PRD](docs/requirements/01-PRD.md) để nắm đối tượng, mục tiêu học tập và phạm vi MVP/V1/V2. Dùng [SRS](docs/requirements/02-SRS.md) và [Tiêu chí nghiệm thu](docs/requirements/04-acceptance-criteria.md) để định nghĩa hành vi cần xây.
-3. Mở [Lộ trình tổng](docs/plans/00-master-roadmap.md), [Sprint 00](docs/plans/sprint-00.md) và [Sprint 01](docs/plans/sprint-01.md). Dùng API, ERD, thiết kế giao diện và QA làm chuẩn đối chiếu ở mỗi task.
+Email authentication and onboarding are the next scheduled work. [Full roadmap](docs/plans/00-master-roadmap.md)
 
-## Cách đọc bằng chứng
+## Documentation
 
-| Nhãn | Ý nghĩa |
-|---|---|
-| **OBSERVED** | Ghi nhận giao diện, thao tác hoặc kết quả trực tiếp tại URL và điều kiện đã nêu trong sổ bằng chứng. Phạm vi quan sát nằm ở từng mục. |
-| **INFERRED** | Suy luận có căn cứ, với giải thích và bằng chứng tham chiếu. Cần thử thêm để xác định hành vi trong các điều kiện chưa thấy. |
-| **PROPOSED** | Quyết định đề xuất cho sản phẩm mới, gồm mô hình dữ liệu, API, công nghệ, thuật toán và các ca kiểm thử tương lai. |
-| **UNVERIFIED** | Trạng thái kiểm chứng của câu hỏi còn mở, chẳng hạn thiếu quyền, điều kiện dữ liệu, quyền mic, kết quả không quan sát được hoặc ngoài phạm vi thao tác. |
+- [Product requirements](docs/requirements/01-PRD.md) and [software requirements](docs/requirements/02-SRS.md)
+- [System architecture](docs/architecture/01-system-architecture.md) and [local toolchain decisions](docs/architecture/adr/0001-local-toolchain-and-monorepo.md)
+- [Database design](docs/architecture/04-database-design.md) and [target API specification](docs/architecture/05-api-specification.md)
+- [Testing strategy](docs/testing/01-test-strategy.md) and [development roadmap](docs/plans/00-master-roadmap.md)
 
-Mã bằng chứng dẫn về sổ khảo sát. Mã `FR-…` nối SRS với nghiệm thu và các sprint. Mã `QA-…` định danh ca kiểm thử của sản phẩm mới. Kiến trúc đề xuất dựa trên nhu cầu xây dựng và các bất biến đã ghi trong đặc tả. Số liệu, tài khoản và bối cảnh của AIO English chỉ được mô tả ở mức cần để hiểu hành vi. Thiết kế và fixture mới dùng nhận diện, ngôn ngữ và nội dung riêng.
+## Current Project Status
 
-## Mục lục tài liệu
-
-### Khảo sát
-
-1. [Phạm vi, phương pháp và kết quả khảo sát](docs/research/01-site-exploration.md)
-2. [Danh mục chức năng](docs/research/02-feature-inventory.md)
-3. [Kiểm kê từng trang](docs/research/03-page-by-page-audit.md)
-4. [Luồng người dùng](docs/research/04-user-flows.md)
-5. [Phân tích giao diện và trải nghiệm](docs/research/05-ui-ux-analysis.md)
-6. [Bằng chứng và ảnh chụp](docs/research/06-evidence-and-screenshots.md)
-7. [Hạng mục chưa xác minh](docs/research/07-unverified-features.md)
-
-### Yêu cầu
-
-1. [PRD](docs/requirements/01-PRD.md)
-2. [SRS và functional requirements](docs/requirements/02-SRS.md)
-3. [User stories](docs/requirements/03-user-stories.md)
-4. [Tiêu chí nghiệm thu](docs/requirements/04-acceptance-criteria.md)
-5. [Yêu cầu phi chức năng](docs/requirements/05-non-functional-requirements.md)
-6. [Ma trận đối chiếu 49 nhóm chức năng](docs/requirements/06-feature-parity-matrix.md)
-
-### Kiến trúc
-
-1. [Kiến trúc hệ thống](docs/architecture/01-system-architecture.md)
-2. [Kiến trúc frontend](docs/architecture/02-frontend-architecture.md)
-3. [Kiến trúc backend](docs/architecture/03-backend-architecture.md)
-4. [Thiết kế PostgreSQL và ERD](docs/architecture/04-database-design.md)
-5. [Hợp đồng REST API](docs/architecture/05-api-specification.md)
-6. [Bộ máy bài tập](docs/architecture/06-exercise-engines.md)
-7. [Kiến trúc triển khai](docs/architecture/07-deployment-architecture.md)
-8. [ADR 0001 — Monorepo và toolchain](docs/architecture/adr/0001-local-toolchain-and-monorepo.md)
-9. [ADR 0002 — HTTP, local và các quyết định production còn mở](docs/architecture/adr/0002-http-and-deployment-baseline.md)
-10. [ADR 0003 — Biến thể, điểm và kho từ](docs/architecture/adr/0003-learning-variants-rewards-vocabulary.md)
-
-### Thiết kế sản phẩm
-
-1. [Design system](docs/design/01-design-system.md)
-2. [Sitemap và định tuyến](docs/design/02-sitemap.md)
-3. [Đặc tả màn hình và wireframe](docs/design/03-screen-specifications.md)
-4. [Danh mục component React](docs/design/04-component-inventory.md)
-
-### Dữ liệu nội dung
-
-1. [Schema nhập và dữ liệu mẫu](docs/data/01-content-schemas.md)
-2. [Nguồn dữ liệu và giấy phép](docs/data/02-data-sources.md)
-3. [Quy trình biên soạn, duyệt và xuất bản](docs/data/03-content-pipeline.md)
-
-### Kế hoạch
-
-1. [Lộ trình, phụ thuộc và cổng phát hành](docs/plans/00-master-roadmap.md)
-2. [Sprint 00 — Chốt yêu cầu và nền tảng](docs/plans/sprint-00.md)
-3. [Sprint 01 — Xác thực và onboarding](docs/plans/sprint-01.md)
-4. [Sprint 02 — Curriculum và CMS](docs/plans/sprint-02.md)
-5. [Sprint 03 — Gõ câu](docs/plans/sprint-03.md)
-6. [Sprint 04 — Tiến độ và dashboard](docs/plans/sprint-04.md)
-7. [Sprint 05 — Từ vựng và SRS](docs/plans/sprint-05.md)
-8. [Sprint 06 — Ngữ pháp và từ điển](docs/plans/sprint-06.md)
-9. [Sprint 07 — Đọc và dịch](docs/plans/sprint-07.md)
-10. [Sprint 08 — Video và dictation](docs/plans/sprint-08.md)
-11. [Sprint 09 — IPA và shadowing](docs/plans/sprint-09.md)
-12. [Sprint 10 — AI](docs/plans/sprint-10.md)
-13. [Sprint 11 — Gamification và cá nhân hóa](docs/plans/sprint-11.md)
-14. [Sprint 12 — Kiểm thử, tối ưu và triển khai](docs/plans/sprint-12.md)
-
-### Kiểm thử và bảo mật
-
-1. [Chiến lược kiểm thử theo tầng](docs/testing/01-test-strategy.md)
-2. [Ma trận ca kiểm thử](docs/testing/02-test-cases.md)
-3. [Hiệu năng, bảo mật và vận hành](docs/testing/03-performance-and-security.md)
-4. [Bằng chứng kiểm chứng Sprint 00](docs/testing/04-sprint-00-verification.md)
-
-Mở README bằng trình đọc Markdown hoặc trình duyệt repository để đi theo liên kết. Muốn xem sơ đồ, dùng trình đọc hỗ trợ Mermaid.
+The current implementation supports a responsive home page with a live API connectivity check and retry, database-aware readiness, a baseline migration, and generated API types. This is a development preview. The first learner-facing milestone is the MVP described above.
