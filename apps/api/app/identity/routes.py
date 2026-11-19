@@ -12,12 +12,14 @@ from app.identity.csrf import (
     valid_guest_value,
 )
 from app.identity.rate_limit import retry_after
+from app.identity.recovery import request_password_reset, reset_password
 from app.identity.schemas import (
     Accepted,
     AuthenticatedSession,
     EmailRequest,
     GuestSession,
     LoginRequest,
+    PasswordResetRequest,
     VerificationRequest,
 )
 from app.identity.service import request_verification, verify_account
@@ -203,6 +205,62 @@ def logout(request: Request) -> Response:
     return response
 
 
+def _mail_unavailable(request: Request) -> Response:
+    return problem_response(
+        request,
+        503,
+        "SERVICE_NOT_READY",
+        "Email delivery is unavailable.",
+        headers={"Retry-After": "60"},
+    )
+
+
+@router.post(
+    "/password/forgot",
+    operation_id="forgotPassword",
+    status_code=202,
+    response_model=Accepted,
+    responses=mutation_errors,
+    openapi_extra=mutation_headers(),
+)
+def forgot_password(
+    request: Request, response: Response, data: EmailRequest, allowed: Allowed
+) -> Accepted | Response:
+    denial = mutation_denial(request, allowed, email=data.email, scope="recovery-mail")
+    if denial is not None:
+        return denial
+    settings = request.app.state.settings
+    key = settings.auth_mail_key_bytes
+    if key is None:
+        return _mail_unavailable(request)
+    request_password_reset(request.app.state.engine, data.email, key, settings.auth_mail_key_id)
+    response.headers.update(private_headers)
+    return Accepted(accepted=True)
+
+
+@router.post(
+    "/password/reset",
+    operation_id="resetPassword",
+    status_code=204,
+    response_class=Response,
+    responses={**mutation_errors, 410: documented_problem("The reset proof is unavailable.")},
+    openapi_extra=mutation_headers(),
+)
+def complete_password_reset(
+    request: Request, data: PasswordResetRequest, allowed: Allowed
+) -> Response:
+    denial = mutation_denial(request, allowed, scope="reset")
+    if denial is not None:
+        return denial
+    if not reset_password(
+        request.app.state.engine, data.token.get_secret_value(), data.password.get_secret_value()
+    ):
+        return problem_response(
+            request, 410, "TOKEN_UNAVAILABLE", "The password reset link is invalid."
+        )
+    return Response(status_code=204, headers=private_headers)
+
+
 def accept_email(
     request: Request, response: Response, data: EmailRequest, allowed: bool, *, register: bool
 ) -> Accepted | Response:
@@ -212,13 +270,7 @@ def accept_email(
     settings = request.app.state.settings
     key = settings.auth_mail_key_bytes
     if key is None:
-        return problem_response(
-            request,
-            503,
-            "SERVICE_NOT_READY",
-            "Email delivery is unavailable.",
-            headers={"Retry-After": "60"},
-        )
+        return _mail_unavailable(request)
     request_verification(
         request.app.state.engine, data.email, key, settings.auth_mail_key_id, register=register
     )

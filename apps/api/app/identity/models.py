@@ -19,6 +19,9 @@ from app.database import Base
 
 VERIFICATION_PURPOSE = "verify_email"
 VERIFICATION_JOB = "auth.verify_email"
+RESET_PURPOSE = "reset_password"
+RESET_JOB = "auth.reset_password"
+AUTH_MAIL_JOB_BY_PURPOSE = {VERIFICATION_PURPOSE: VERIFICATION_JOB, RESET_PURPOSE: RESET_JOB}
 
 
 class User(Base):

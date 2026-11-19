@@ -12,6 +12,9 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.identity.models import (
+    AUTH_MAIL_JOB_BY_PURPOSE,
+    RESET_JOB,
+    RESET_PURPOSE,
     VERIFICATION_JOB,
     VERIFICATION_PURPOSE,
     AuthMailSecret,
@@ -32,18 +35,30 @@ class _Lease:
     owner: str
 
 
-def _verification_message(settings: Settings, recipient: str, token: str) -> EmailMessage:
-    link = f"{settings.auth_public_origin}/verify#token={token}"
+def _proof_message(settings: Settings, recipient: str, token: str, purpose: str) -> EmailMessage:
+    if purpose == RESET_PURPOSE:
+        route = "/reset-password"
+        subject = "Đặt lại mật khẩu cho English Learning Platform"
+        instruction = "Mở liên kết sau để đặt lại mật khẩu."
+        duration = "30 phút"
+        unexpected = "Nếu bạn không yêu cầu đặt lại mật khẩu, hãy bỏ qua thư này."
+    else:
+        route = "/verify"
+        subject = "Xác minh email cho English Learning Platform"
+        instruction = "Mở liên kết sau để xác minh email và thiết lập mật khẩu."
+        duration = "24 giờ"
+        unexpected = "Nếu bạn không yêu cầu tạo tài khoản, hãy bỏ qua thư này."
+
+    link = f"{settings.auth_public_origin}{route}#token={token}"
     message = EmailMessage()
     message["From"] = settings.smtp_sender
     message["To"] = recipient
-    message["Subject"] = "Xác minh email cho English Learning Platform"
+    message["Subject"] = subject
     message.set_content(
         "Chào bạn,\n\n"
-        "Mở liên kết sau để xác minh email và thiết lập mật khẩu. "
-        "Liên kết có hiệu lực trong 24 giờ và chỉ dùng được một lần.\n\n"
+        f"{instruction} Liên kết có hiệu lực trong {duration} và chỉ dùng được một lần.\n\n"
         f"{link}\n\n"
-        "Nếu bạn không yêu cầu tạo tài khoản, hãy bỏ qua thư này.\n"
+        f"{unexpected}\n"
     )
 
     return message
@@ -64,7 +79,7 @@ def _claim(session: Session) -> tuple[bool, _Lease | None]:
         select(Job, AuthMailSecret.expires_at)
         .outerjoin(AuthMailSecret, AuthMailSecret.job_id == Job.id)
         .where(
-            Job.kind == VERIFICATION_JOB,
+            Job.kind.in_(AUTH_MAIL_JOB_BY_PURPOSE.values()),
             Job.status.in_(("queued", "running")),
             or_(
                 AuthMailSecret.job_id.is_(None),
@@ -108,10 +123,21 @@ def _current_delivery(engine: Engine, lease: _Lease) -> tuple[str, AuthMailSecre
                 Job.status == "running",
                 Job.lease_owner == lease.owner,
                 Job.lease_until > func.clock_timestamp(),
-                User.status == "pending",
                 User.deleted_at.is_(None),
                 AuthToken.user_id == AuthMailSecret.user_id,
-                AuthToken.purpose == VERIFICATION_PURPOSE,
+                or_(
+                    and_(
+                        Job.kind == VERIFICATION_JOB,
+                        AuthToken.purpose == VERIFICATION_PURPOSE,
+                        User.status == "pending",
+                    ),
+                    and_(
+                        Job.kind == RESET_JOB,
+                        AuthToken.purpose == RESET_PURPOSE,
+                        User.status == "active",
+                        User.verified_at.is_not(None),
+                    ),
+                ),
                 AuthMailSecret.purpose == AuthToken.purpose,
                 AuthMailSecret.expires_at == AuthToken.expires_at,
                 AuthToken.expires_at > func.clock_timestamp(),
@@ -149,7 +175,7 @@ def _deliver(
                 raise smtplib.SMTPConnectError(status, greeting)
             smtp.ehlo_or_helo_if_needed()
 
-            # Resend or verify can retire the proof during the SMTP handshake.
+            # A replacement or claim can retire the proof during the SMTP handshake.
             delivery = _current_delivery(engine, lease)
             if delivery is None:
                 return "cancelled", None
@@ -168,7 +194,7 @@ def _deliver(
                 )
             except (InvalidTag, ValueError):
                 return "failed", "INVALID_MAIL_SECRET"
-            smtp.send_message(_verification_message(settings, recipient, token))
+            smtp.send_message(_proof_message(settings, recipient, token, secret.purpose))
     except OSError as error:
         if isinstance(error, TimeoutError) or isinstance(error.__context__, TimeoutError):
             return "queued", "SMTP_TIMEOUT"
@@ -198,10 +224,10 @@ def _finalize(session: Session, lease: _Lease, status: str, error_code: str | No
 
 
 def deliver_one(engine: Engine, settings: Settings) -> bool:
-    """Process one due verification mail job, including terminal cleanup."""
+    """Process one due identity mail job, including terminal cleanup."""
     key = settings.auth_mail_key_bytes
     if key is None:
-        raise ValueError("AUTH_MAIL_KEY is required by the verification mail worker")
+        raise ValueError("AUTH_MAIL_KEY is required by the identity mail worker")
     with Session(engine) as session, session.begin():
         processed, lease = _claim(session)
     if lease is not None:

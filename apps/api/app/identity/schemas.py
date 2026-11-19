@@ -15,6 +15,9 @@ def validate_utf8(value: str | SecretStr) -> str | SecretStr:
 
 
 Password = Annotated[SecretStr, Field(min_length=12, max_length=128), AfterValidator(validate_utf8)]
+ProofToken = Annotated[
+    SecretStr, Field(min_length=1, max_length=128), AfterValidator(validate_utf8)
+]
 
 
 class EmailRequest(BaseModel):
@@ -35,11 +38,14 @@ class EmailRequest(BaseModel):
         return email
 
 
-class VerificationRequest(BaseModel):
+class PasswordResetRequest(BaseModel):
     model_config = ConfigDict(extra="forbid", hide_input_in_errors=True)
 
-    token: SecretStr = Field(min_length=1, max_length=128)
+    token: ProofToken
     password: Password
+
+
+class VerificationRequest(PasswordResetRequest):
     display_name: str = Field(min_length=1, max_length=80)
 
     @field_validator("display_name", mode="before")
@@ -51,9 +57,9 @@ class VerificationRequest(BaseModel):
                 raise ValueError("Invalid display name")
         return value
 
-    @field_validator("token", "display_name")
+    @field_validator("display_name")
     @classmethod
-    def validate_utf8(cls, value: str | SecretStr) -> str | SecretStr:
+    def valid_display_name_utf8(cls, value: str) -> str | SecretStr:
         return validate_utf8(value)
 
 

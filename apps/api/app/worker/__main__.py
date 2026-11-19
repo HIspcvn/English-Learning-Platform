@@ -15,7 +15,7 @@ def main() -> None:
     logging.basicConfig(level=logging.INFO)
     settings = Settings()
     if settings.auth_mail_key_bytes is None:
-        raise SystemExit("AUTH_MAIL_KEY is required by the verification mail worker")
+        raise SystemExit("AUTH_MAIL_KEY is required by the identity mail worker")
 
     engine = create_runtime_engine(settings)
     next_session_cleanup = monotonic()

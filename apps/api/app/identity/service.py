@@ -3,13 +3,13 @@ from hashlib import sha256
 from secrets import token_urlsafe
 from uuid import UUID, uuid4
 
-from argon2 import PasswordHasher
+from argon2 import PasswordHasher, Type
 from sqlalchemy import Engine, delete, select, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
 from app.identity.models import (
-    VERIFICATION_JOB,
+    AUTH_MAIL_JOB_BY_PURPOSE,
     VERIFICATION_PURPOSE,
     AuthMailSecret,
     AuthToken,
@@ -21,7 +21,7 @@ from app.worker.secrets import encrypt_token
 
 VERIFICATION_TTL = timedelta(hours=24)
 RESEND_COOLDOWN = timedelta(seconds=60)
-password_hasher = PasswordHasher()
+password_hasher = PasswordHasher(type=Type.ID)
 
 
 def utc_now() -> datetime:
@@ -44,7 +44,7 @@ def retire_delivery(session: Session, token_id: UUID) -> None:
     session.execute(
         update(Job)
         .where(
-            Job.kind == VERIFICATION_JOB,
+            Job.kind.in_(AUTH_MAIL_JOB_BY_PURPOSE.values()),
             Job.dedupe_key == str(token_id),
             Job.status.in_(("queued", "running")),
         )
@@ -53,18 +53,25 @@ def retire_delivery(session: Session, token_id: UUID) -> None:
     session.execute(delete(AuthMailSecret).where(AuthMailSecret.token_id == token_id))
 
 
-def issue_verification(
-    session: Session, user: User, now: datetime, key: bytes, key_id: str
+def issue_mail_proof(
+    session: Session,
+    user: User,
+    now: datetime,
+    key: bytes,
+    key_id: str,
+    *,
+    purpose: str,
+    ttl: timedelta,
 ) -> None:
     token = new_token()
     token_id, job_id = uuid4(), uuid4()
-    expires_at = now + VERIFICATION_TTL
+    expires_at = now + ttl
     ciphertext, nonce = encrypt_token(
         key,
         token,
         user_id=user.id,
         token_id=token_id,
-        purpose=VERIFICATION_PURPOSE,
+        purpose=purpose,
         expires_at=expires_at,
     )
     session.add_all(
@@ -72,20 +79,20 @@ def issue_verification(
             AuthToken(
                 id=token_id,
                 user_id=user.id,
-                purpose=VERIFICATION_PURPOSE,
+                purpose=purpose,
                 token_digest=digest_token(token),
                 expires_at=expires_at,
             ),
             Job(
                 id=job_id,
-                kind=VERIFICATION_JOB,
+                kind=AUTH_MAIL_JOB_BY_PURPOSE[purpose],
                 dedupe_key=str(token_id),
                 status="queued",
                 attempts=0,
                 payload={
                     "user_id": str(user.id),
                     "token_id": str(token_id),
-                    "purpose": VERIFICATION_PURPOSE,
+                    "purpose": purpose,
                 },
                 available_at=now,
             ),
@@ -97,13 +104,32 @@ def issue_verification(
             job_id=job_id,
             user_id=user.id,
             token_id=token_id,
-            purpose=VERIFICATION_PURPOSE,
+            purpose=purpose,
             token_ciphertext=ciphertext,
             nonce=nonce,
             kms_key_id=key_id,
             expires_at=expires_at,
         )
     )
+
+
+def lock_current_proof(session: Session, user_id: UUID, purpose: str) -> AuthToken | None:
+    return session.scalar(
+        select(AuthToken)
+        .where(
+            AuthToken.user_id == user_id,
+            AuthToken.purpose == purpose,
+            AuthToken.consumed_at.is_(None),
+            AuthToken.superseded_at.is_(None),
+        )
+        .with_for_update()
+    )
+
+
+def supersede_proof(session: Session, proof: AuthToken, now: datetime) -> None:
+    proof.superseded_at = now
+    retire_delivery(session, proof.id)
+    session.flush()
 
 
 def request_verification(
@@ -125,24 +151,15 @@ def request_verification(
         if user is None or user.status != "pending" or user.deleted_at is not None:
             return
 
-        current = session.scalar(
-            select(AuthToken)
-            .where(
-                AuthToken.user_id == user.id,
-                AuthToken.purpose == VERIFICATION_PURPOSE,
-                AuthToken.consumed_at.is_(None),
-                AuthToken.superseded_at.is_(None),
-            )
-            .with_for_update()
-        )
+        current = lock_current_proof(session, user.id, VERIFICATION_PURPOSE)
         now = utc_now()
         if current is not None:
             if now < current.expires_at - VERIFICATION_TTL + RESEND_COOLDOWN:
                 return
-            current.superseded_at = now
-            retire_delivery(session, current.id)
-            session.flush()
-        issue_verification(session, user, now, key, key_id)
+            supersede_proof(session, current, now)
+        issue_mail_proof(
+            session, user, now, key, key_id, purpose=VERIFICATION_PURPOSE, ttl=VERIFICATION_TTL
+        )
 
 
 def verify_account(engine: Engine, token: str, password: str, display_name: str) -> bool:
