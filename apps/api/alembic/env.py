@@ -1,10 +1,12 @@
 from alembic import context
-from sqlalchemy import MetaData, create_engine
+from sqlalchemy import create_engine
 from sqlalchemy.pool import NullPool
 
 from app.config import Settings
+from app.database import Base
+from app.identity import models as _identity_models  # noqa: F401
 
-target_metadata = MetaData()
+target_metadata = Base.metadata
 database_url = Settings().database_url.get_secret_value()
 
 if context.is_offline_mode():

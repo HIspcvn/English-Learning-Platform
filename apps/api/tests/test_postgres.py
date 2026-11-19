@@ -1,54 +1,47 @@
-import os
-from pathlib import Path
+from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
 import pytest
 from alembic import command
-from alembic.config import Config
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, inspect, text
-from sqlalchemy.engine import make_url
-from sqlalchemy.schema import CreateSchema, DropSchema
+from sqlalchemy import Uuid, inspect, text
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from app.identity.models import VERIFICATION_PURPOSE, AuthToken, User
 
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture
-def clean_schema(monkeypatch):
-    configured_url = os.environ.get("TEST_DATABASE_URL")
-    if not configured_url:
-        pytest.skip("Set TEST_DATABASE_URL to run the PostgreSQL integration test")
-
-    schema = f"s00_{uuid4().hex}"
-    base_engine = create_engine(configured_url)
-    with base_engine.begin() as connection:
-        connection.execute(CreateSchema(schema))
-
-    # A private search path keeps all fixture migrations isolated from application data.
-    url = make_url(configured_url).update_query_dict({"options": f"-csearch_path={schema}"})
-    scoped_engine = create_engine(url)
-    monkeypatch.setenv("DATABASE_URL", url.render_as_string(hide_password=False))
-
-    try:
-        yield scoped_engine
-    finally:
-        scoped_engine.dispose()
-        with base_engine.begin() as connection:
-            connection.execute(DropSchema(schema, cascade=True))
-        base_engine.dispose()
-
-
-def test_readiness_tracks_clean_upgrade_revision_mismatch_and_downgrade(clean_schema):
+def test_readiness_tracks_clean_upgrade_revision_mismatch_and_downgrade(clean_schema, migrations):
     from app.main import app
 
-    migrations = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
     with TestClient(app) as client:
         assert inspect(clean_schema).get_table_names() == []
         assert client.get("/health/ready").status_code == 503
 
+        command.upgrade(migrations, "0001_sprint_00_baseline")
+        assert inspect(clean_schema).get_table_names() == ["alembic_version"]
+        assert client.get("/health/ready").status_code == 503
+
         command.upgrade(migrations, "head")
         command.check(migrations)
-        assert inspect(clean_schema).get_table_names() == ["alembic_version"]
+        inspector = inspect(clean_schema)
+        product_tables = {
+            "auth_mail_secrets",
+            "auth_rate_limits",
+            "auth_tokens",
+            "jobs",
+            "user_profiles",
+            "users",
+        }
+        assert set(inspector.get_table_names()) == {"alembic_version", *product_tables}
+        for table in product_tables:
+            primary_key = inspector.get_pk_constraint(table)["constrained_columns"]
+            [column] = [
+                item for item in inspector.get_columns(table) if item["name"] in primary_key
+            ]
+            assert isinstance(column["type"], Uuid)
         ready = client.get("/health/ready")
         assert ready.status_code == 200
         assert ready.json() == {"status": "ready"}
@@ -65,5 +58,52 @@ def test_readiness_tracks_clean_upgrade_revision_mismatch_and_downgrade(clean_sc
             connection.execute(
                 text("UPDATE alembic_version SET version_num = :revision"), {"revision": revision}
             )
-        command.downgrade(migrations, "base")
+        command.downgrade(migrations, "0001_sprint_00_baseline")
+        assert inspect(clean_schema).get_table_names() == ["alembic_version"]
         assert client.get("/health/ready").status_code == 503
+
+        command.downgrade(migrations, "base")
+        with clean_schema.connect() as connection:
+            assert (
+                connection.execute(text("SELECT count(*) FROM alembic_version")).scalar_one() == 0
+            )
+
+
+@pytest.mark.parametrize(
+    ("status", "password_hash"), [("pending", "synthetic-hash"), ("active", None)]
+)
+def test_migration_enforces_account_credentials(identity_engine, status, password_hash):
+    email = "identity@example.test"
+    with Session(identity_engine) as session, pytest.raises(IntegrityError) as error:
+        session.add(User(email=email, email_norm=email, status=status, password_hash=password_hash))
+        session.flush()
+
+    assert error.value.orig.diag.constraint_name == "ck_users_status_credentials"
+
+
+def test_migration_enforces_one_open_proof_per_user_and_purpose(identity_engine):
+    now = datetime.now(UTC)
+    user_id = uuid4()
+    email = "identity@example.test"
+    first_id = uuid4()
+    proof = {
+        "user_id": user_id,
+        "purpose": VERIFICATION_PURPOSE,
+        "expires_at": now + timedelta(hours=24),
+    }
+
+    with Session(identity_engine) as session, session.begin():
+        session.add(User(id=user_id, email=email, email_norm=email, status="pending"))
+        session.flush()
+        session.add(AuthToken(id=first_id, token_digest=bytes(32), **proof))
+
+    with Session(identity_engine) as session, pytest.raises(IntegrityError) as error:
+        session.add(AuthToken(token_digest=bytes(range(32)), **proof))
+        session.flush()
+
+    assert error.value.orig.diag.constraint_name == "uq_auth_tokens_open_user_purpose"
+
+    with Session(identity_engine) as session, session.begin():
+        session.get_one(AuthToken, first_id).superseded_at = now
+        session.flush()
+        session.add(AuthToken(token_digest=bytes(range(32)), **proof))
