@@ -18,4 +18,4 @@ RUN groupadd --system --gid 10001 api \
     && useradd --system --uid 10001 --gid 10001 --no-create-home api
 USER 10001:10001
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log", "--no-proxy-headers"]

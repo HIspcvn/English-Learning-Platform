@@ -38,9 +38,7 @@ services:
   api:
     build:
       context: ./apps/api
-    environment:
-      <<: *identity-environment
-      FORWARDED_ALLOW_IPS: ""
+    environment: *identity-environment
     depends_on:
       db:
         condition: service_healthy

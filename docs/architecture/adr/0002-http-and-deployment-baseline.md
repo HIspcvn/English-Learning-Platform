@@ -10,6 +10,12 @@
 - `DATABASE_URL` là DSN SQLAlchemy `postgresql+psycopg://` cho API/Alembic. `TEST_DATABASE_URL` chỉ trỏ vào PostgreSQL dùng một lần cho test có migration. Root `.env.example` là mẫu Compose với dữ liệu dev. Các giá trị thật đi qua env/secret store, không đưa về browser hoặc commit. Port mở trên loopback local.
 - Hợp đồng Sprint 01 dùng cookie `__Host-elp_session` opaque, Secure, HttpOnly, SameSite=Lax. Mutation kiểm Origin và CSRF. Guest dùng double-submit, learner dùng header HMAC gắn phiên. OpenAPI thể hiện request/response trước khi tạo client. Các chuẩn này triển khai theo [hợp đồng auth](../05-api-specification.md).
 
+## Trust boundary cho rate limiting
+
+Local, CI và Compose chạy Uvicorn với `--no-proxy-headers`. API lấy IP từ kết nối trực tiếp. Qua rewrite Next.js, các request dùng chung quota IP của tiến trình Next. Các endpoint theo email còn có quota theo email chuẩn hóa. Next có thể chuyển tiếp `X-Forwarded-For` do client cung cấp, nên API local bỏ qua toàn bộ forwarded headers.
+
+Khi triển khai production, ingress TLS cùng origin định tuyến `/api/v1/` trực tiếp tới FastAPI. Chỉ ingress được kết nối vào cổng API. Tại ingress, loại forwarded headers từ Internet và đặt `X-Forwarded-For` bằng IP của kết nối đã xác thực ở biên. Khi bật `--proxy-headers`, cấu hình Uvicorn `--forwarded-allow-ips` với đúng địa chỉ ingress được phép. Với dịch vụ cân bằng tải phía trước, chỉ dùng địa chỉ client do tầng tin cậy cung cấp sau khi chặn đường vào trực tiếp. Kiểm thử hai địa chỉ thật dùng hai bucket, header tự khai giữ nguyên bucket, và client Internet không được kết nối trực tiếp vào API trước khi bật ở staging.
+
 ## Open Decision
 
 | Quyết định | Chủ trì | Hạn và tiêu chí chốt |
