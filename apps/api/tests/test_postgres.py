@@ -30,8 +30,10 @@ def test_readiness_tracks_clean_upgrade_revision_mismatch_and_downgrade(clean_sc
         product_tables = {
             "auth_mail_secrets",
             "auth_rate_limits",
+            "auth_sessions",
             "auth_tokens",
             "jobs",
+            "learning_preferences",
             "user_profiles",
             "users",
         }

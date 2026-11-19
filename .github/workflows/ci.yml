@@ -81,6 +81,7 @@ jobs:
       - name: Run browser smoke tests
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3000
+          PLAYWRIGHT_MAILPIT_URL: http://127.0.0.1:8025
         run: |
           npm exec --workspace @elp/web -- playwright install --with-deps chromium
           npm run test:e2e
