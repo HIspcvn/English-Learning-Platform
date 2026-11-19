@@ -5,7 +5,7 @@ import Link from "next/link";
 import { login } from "@/lib/api/auth";
 
 import { AuthField } from "./fields";
-import { loginDestination, readText, validateEmail } from "./flow";
+import { loginDestination, readText, validateEmail, validatePassword } from "./flow";
 import { AuthForm, AuthNotice } from "./form";
 import { AuthFooter, authLink } from "./shell";
 
@@ -16,14 +16,9 @@ export function LoginForm({ notice }: { notice?: string }) {
       <AuthForm
         label="Đăng nhập"
         pendingLabel="Đang đăng nhập…"
-        validate={(data) => {
-          const emailIssue = validateEmail(readText(data, "email").trim());
-          if (emailIssue) return emailIssue;
-          const length = Array.from(readText(data, "password")).length;
-          if (length === 0 || length > 128) {
-            return { field: "password", message: "Vui lòng nhập mật khẩu tối đa 128 ký tự." };
-          }
-        }}
+        validate={(data) =>
+          validateEmail(readText(data, "email").trim()) ?? validatePassword(readText(data, "password"))
+        }
         action={async (data) => {
           const { user } = await login({
             email: readText(data, "email").trim(),

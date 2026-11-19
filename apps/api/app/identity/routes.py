@@ -1,6 +1,9 @@
+from asyncio import sleep
+from time import monotonic
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Request, Response
+from starlette.concurrency import run_in_threadpool
 
 from app.errors import Problem, problem_response
 from app.identity.csrf import (
@@ -32,6 +35,7 @@ from app.identity.sessions import (
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["identity"])
+RECOVERY_RESPONSE_FLOOR_SECONDS = 0.25
 
 
 def documented_problem(description: str) -> dict:
@@ -223,17 +227,26 @@ def _mail_unavailable(request: Request) -> Response:
     responses=mutation_errors,
     openapi_extra=mutation_headers(),
 )
-def forgot_password(
+async def forgot_password(
     request: Request, response: Response, data: EmailRequest, allowed: Allowed
 ) -> Accepted | Response:
-    denial = mutation_denial(request, allowed, email=data.email, scope="recovery-mail")
+    started = monotonic()
+    denial = await run_in_threadpool(
+        mutation_denial, request, allowed, email=data.email, scope="recovery-mail"
+    )
     if denial is not None:
         return denial
     settings = request.app.state.settings
     key = settings.auth_mail_key_bytes
     if key is None:
         return _mail_unavailable(request)
-    request_password_reset(request.app.state.engine, data.email, key, settings.auth_mail_key_id)
+    await run_in_threadpool(
+        request_password_reset, request.app.state.engine, data.email, key, settings.auth_mail_key_id
+    )
+    # Normalize ordinary accepted response times after the recovery transaction releases its locks.
+    remaining = RECOVERY_RESPONSE_FLOOR_SECONDS - (monotonic() - started)
+    if remaining > 0:
+        await sleep(remaining)
     response.headers.update(private_headers)
     return Accepted(accepted=True)
 

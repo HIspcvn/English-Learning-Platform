@@ -25,11 +25,16 @@ export function validateEmail(email: string): FieldIssue | undefined {
   }
 }
 
-export function validateNewPassword(password: string, confirmation: string): FieldIssue | undefined {
+export function validatePassword(password: string): FieldIssue | undefined {
   const length = Array.from(password).length;
   if (length < 12 || length > 128) {
     return { field: "password", message: "Mật khẩu phải có từ 12 đến 128 ký tự." };
   }
+}
+
+export function validateNewPassword(password: string, confirmation: string): FieldIssue | undefined {
+  const issue = validatePassword(password);
+  if (issue) return issue;
   if (password !== confirmation) {
     return { field: "confirmation", message: "Hai mật khẩu chưa khớp." };
   }
