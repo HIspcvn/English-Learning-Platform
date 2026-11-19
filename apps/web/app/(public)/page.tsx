@@ -1,3 +1,6 @@
+import Link from "next/link";
+
+import { authLink } from "@/features/auth/shell";
 import { ApiStatus } from "@/features/platform-status/api-status";
 
 export default function Home() {
@@ -19,6 +22,15 @@ export default function Home() {
           <p className="mt-4 max-w-md text-lg/8 text-muted-ink">
             Nền tảng học tiếng Anh dành cho người nói tiếng Việt.
           </p>
+          <nav aria-label="Tài khoản" className="mt-7 flex flex-wrap items-center gap-x-6 gap-y-3">
+            <Link
+              className="rounded-lg bg-brand px-5 py-3 font-semibold text-white hover:bg-brand/90 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-focus"
+              href="/register"
+            >
+              Đăng ký
+            </Link>
+            <Link className={authLink} href="/login">Đăng nhập</Link>
+          </nav>
         </div>
         <ApiStatus />
       </main>
