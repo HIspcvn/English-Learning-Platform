@@ -9,11 +9,13 @@ from uuid import UUID, uuid4
 from fastapi import FastAPI, Request, Response
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
+from sqlalchemy.exc import OperationalError
 from starlette.exceptions import HTTPException
 
 from app.config import Settings
 from app.database import create_runtime_engine, database_is_ready, expected_migration_heads
 from app.errors import Problem, problem_response
+from app.identity.routes import router as identity_router
 
 access_log = logging.getLogger("app.access")
 
@@ -25,7 +27,9 @@ async def lifespan(application: FastAPI) -> AsyncIterator[None]:
     access_log.setLevel(logging.INFO)
 
     application.state.migration_heads = expected_migration_heads()
-    engine = create_runtime_engine(Settings())
+    settings = Settings()
+    application.state.settings = settings
+    engine = create_runtime_engine(settings)
     application.state.engine = engine
     try:
         yield
@@ -41,6 +45,7 @@ app = FastAPI(
     redoc_url=None,
     lifespan=lifespan,
 )
+app.include_router(identity_router)
 
 
 def request_id(header: str) -> str:
@@ -92,6 +97,13 @@ async def handle_http_exception(request: Request, error: HTTPException) -> Respo
 @app.exception_handler(RequestValidationError)
 async def handle_validation_exception(request: Request, _error: RequestValidationError) -> Response:
     return problem_response(request, 422, "VALIDATION_ERROR", "The request was invalid.")
+
+
+@app.exception_handler(OperationalError)
+async def handle_database_outage(request: Request, _error: OperationalError) -> Response:
+    return problem_response(
+        request, 503, "SERVICE_NOT_READY", "The service is not ready.", headers={"Retry-After": "5"}
+    )
 
 
 class Liveness(BaseModel):
