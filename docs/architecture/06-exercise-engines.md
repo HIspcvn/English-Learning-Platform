@@ -22,11 +22,24 @@ sequenceDiagram
   A->>D: Commit append-only attempt, revision, cursor
   A-->>U: Feedback and updated RunView
   U->>A: Complete after last required item
-  A->>D: Completion + progress transaction
+  A->>D: Completion + progress + eligible XP + saved vocabulary
   A-->>U: Completion receipt
 ```
 
 ## Typing: FR-TYPE-001
+
+### Mode, difficulty và lựa chọn item
+
+| Practice mode | Cơ bản `basic` | Trung cấp `intermediate` | Nâng cao `advanced` |
+| --- | --- | --- | --- |
+| Mặc định `default` | MVP · từ, cụm, câu | MVP · từ, câu | MVP · câu |
+| Nghe `listen` | Không hỗ trợ | Không hỗ trợ | MVP · câu, phát audio, gõ lại |
+| Nghe và nói `listen_speak` | Không hỗ trợ | Không hỗ trợ | V1 · câu, nghe mẫu, tự xác nhận đã luyện. Chấm tự động thuộc quyết định V2. |
+
+- Tác giả đánh dấu `typing_variants` trong phiên bản, gắn `word/phrase/sentence` cho từng prompt và sắp `exercises.position`. Với lane được phase hỗ trợ, lọc exercise typing `required=true` theo loại prompt của ma trận, sắp theo position tăng dần, ghim ordinal 1..N trong `run_items` khi bắt đầu. Optional item không tham gia typing run. Không bốc ngẫu nhiên hay chọn bài từ dữ liệu người học. CMS báo lỗi lane rỗng, loại nội dung thiếu dữ liệu hoặc license/audio chưa đủ, giữ lane đóng đến khi bản hợp lệ được publish.
+- Default cho thấy cue/bản dịch đã duyệt và chỉ công bố reference sau khi được phép. Listen dùng audio mẫu hợp lệ và ẩn lời/bản dịch đến lúc phản hồi đủ điều kiện. Listen_speak dùng audio mẫu, ghi và phát lại cục bộ nếu người học cấp quyền, tự xác nhận `practice_ack` cho từng mục và thu hồi tài nguyên ghi ngay khi rời. Người học có thể nghe và tự xác nhận khi không cấp mic. V1 gửi duy nhất lệnh tự xác nhận, gồm item, revision và kind. Khi audio lỗi, giữ lại cursor và hướng dẫn thử lại hoặc chọn lane khác. Lỗi tải audio không tính attempt, pass hoặc completion.
+- Identity một lane là learner + lesson + phiên bản + mode + difficulty. Chọn lane tạo hoặc tiếp tục theo khóa đó. Reload và ngắt kết nối lấy run ID, revision, terminal count và cursor từ server. Đổi mode hoặc difficulty điều hướng về chọn lane rồi mở run khác. Lượt đang làm vẫn giữ nguyên để mở lại. Khi publish bản mới, lượt mới lấy phiên bản current; run cũ còn quyền tiếp tục qua ID. Replay là thao tác riêng khi đã hoàn tất lane, không ghi đè lượt đang làm hoặc kết quả cũ.
+- Điều kiện mở bài thuộc `lesson_prerequisites`. Prerequisite `recommended` cho phép đi tiếp, `required` cần có completion hợp lệ của bài trước, không cần mastery. Với bài đã mở, mọi lane đủ điều kiện nội dung và phase được chọn ngay. Hoàn thành ở một lane/version chỉ ghi thành tích lane/version đó và progress lesson identity, không đánh dấu các lane khác hoàn tất. Khi version mất quyền, chặn làm tiếp và vẫn cho xem kết quả tổng hợp đã ghi.
 
 ### Chuẩn hóa và token
 
@@ -40,8 +53,27 @@ sequenceDiagram
 - Levenshtein trên token: match cost 0; substitute, delete expected (missing), insert actual (extra) cost 1. Dynamic programming với traceback từ cuối, tie priority theo hướng traceback `match → substitute → missing → extra`. Ma trận `(n+1)*(m+1)` với cap 128 để thời gian/bộ nhớ O(nm), ổn định cả lặp token. Thứ tự kết quả sau reverse là theo chuỗi.
 - Chạy từng reference (tối đa 10), chọn distance nhỏ nhất rồi reference theo thứ tự biên soạn. Alignment ops `match/wrong/missing/extra` chứa index expected/actual phù hợp. UI dùng chữ/ký hiệu và màu cùng lúc. Không trả `expected_token` cho wrong/missing trước reveal; nêu vị trí và loại lỗi. Các token learner đã gõ an toàn để echo dưới dạng plain text. `passed` nếu distance=0; `score=round_half_up(100 × max(0,1-distance/max(n,m,1)),2)`.
 - Thành công hoàn toàn đưa item vào passed và advance cursor; UI giữ feedback tới khi chọn Tiếp tục, rồi render current item đã được server xác nhận. Sai để nguyên item, hiện lý do, cho retry. Submits trùng được ràng buộc theo request key/revision theo API. Kể cả mới thay key, một revision/cursor cũ không tạo điểm kép.
-- Nudge tối đa một lần/item khi mode cho phép; editor cung cấp chiều dài, mẹo hoặc ngữ cảnh, không trích đáp án đầy đủ. Reveal xuất hiện khi có tối thiểu 2 lần thử hợp lệ sai; terminal `revealed` ở chế độ luyện và `assisted=true`. Đề kiểm tra tắt hint/reveal và kết thúc item sau lần thử hợp lệ đầu tiên, lưu kết quả pass/fail. Limit tần suất + cap bảo vệ tài nguyên.
-- Chỉ cần tất cả required items terminal để hoàn tất; report số đúng độc lập, assisted, tỷ lệ đúng lần đầu và điểm theo mode. Điểm bài typing MVP lấy trung bình điểm terminal: pass 100, revealed 0, chế độ kiểm tra lấy điểm attempt, item optional không đổi mẫu số. Translation/IPA self-practice với toàn bộ kết quả unscored trả điểm null; mẫu số analytics loại trừ item không tính điểm. Một lần hoàn thành được tạo theo run, replay phải trả cùng result. XP V2 lấy lần hoàn thành đầu của lesson đủ điều kiện làm nguồn thưởng. Replay, hoàn thành lại hoặc hai run cùng lesson cạnh tranh đều có tối đa một grant theo nguồn.
+- Nudge tối đa một lần/item trong graded mode khi có nội dung hint đã duyệt, có thể cho độ dài hoặc ngữ cảnh. Nudge đặt item assisted và giữ cursor. Lần nộp sau nudge hoặc trợ giúp tương đương có `assisted=true`; bản ghi lần nộp trước đó giữ cờ trước thời điểm hỗ trợ. Reveal chỉ có sau ít nhất hai lần thử sai hợp lệ ở cùng item. Reveal phát nội dung mẫu, đặt assisted và terminal `revealed`, advance cursor, không chèn attempt. Listener speech không dùng nudge/reveal. Blank, validation, stale revision và replay cùng key không tăng bộ đếm.
+
+### Completion, điểm và thưởng
+
+| Chỉ số | Quy tắc cho typing |
+| --- | --- |
+| First Attempt Accuracy | `100 × first_attempt_correct_count / graded_count` trên toàn bộ mục graded bắt buộc. Tử số chỉ tính lần nộp hợp lệ đầu pass và unassisted. Fail lần đầu, first attempt assisted, reveal hoặc chưa nộp đóng góp 0. Nếu không có mục graded thì null. |
+| Final Completion | Run chuyển completed khi tất cả required items đã terminal và learner gửi complete. Graded terminal là passed hoặc revealed. Speech terminal là self_ack. Đây là trạng thái tiến độ, độc lập với accuracy hoặc kết quả chấm. |
+| Assisted attempts và reveal | Báo riêng `assisted_count` là số required items dùng trợ giúp, `revealed_count` là số mục kết thúc bằng đáp án. Cờ `Feedback.assisted` mô tả đúng attempt, không đổi khi item được hỗ trợ về sau. |
+| Terminal Score | `100 × passed_count / graded_count`. Pass do retry hoặc sau nudge vẫn tính 1, reveal tính 0. Không lấy trung bình điểm alignment của từng lượt nộp. Speech trả null. |
+| Mastery | Một completion graded đạt mastery khi mọi required item passed unassisted và first-attempt accuracy thực ≥80%. So bằng số đếm trước khi làm tròn UI. Giá trị đọc per lane/version giữ lịch sử đã đạt, còn kết quả từng run giữ nguyên. Speech trả null. |
+| XP eligibility | Run typing graded hoàn tất và mọi required item kết thúc passed unassisted. Retry được tính nếu không dùng trợ giúp. Eligibility không cần mastery. +10 XP cho completion đầu đủ điều kiện theo learner + lesson, qua mọi mode, difficulty và version. Sau đó receipt vẫn phản ánh eligibility, `xp_delta=0`. Speech, reveal hoặc nudge không đủ điều kiện. |
+
+Các giá trị phần trăm làm tròn half-up 2 chữ số chỉ sau khi kiểm ngưỡng. Báo required/graded/passed/revealed/self_ack và lần đầu đúng qua `TypingMetrics`. Speech không tạo grade number; self_ack là thực hành đã ghi nhận. Điểm terminal của typing là `CompletionReceipt.score`. Các loại bài khác tiếp tục dùng policy riêng. Công thức +10 và cách tính mastery là quyết định sản phẩm mới, theo dõi phản ứng pilot qua nhật ký riêng tư; streak, leaderboard và thành tích mở rộng thuộc V2.
+
+### Nối kho từ và SRS
+
+1. Content editor chọn từng `meaning_id` từ catalog để nối với exercise trong snapshot. Chỉ lấy nghĩa còn khả dụng từ required items được materialize của graded run, kể cả revealed. Các target trùng collapse theo identity nghĩa; ví dụ hai từ đồng hình khác sense vẫn là hai mục.
+2. Sprint 03 commit completion + progress + XP đúng một lần. Sprint 04 đọc XP cá nhân. Sprint 05 thêm insert kho từ trong cùng completion transaction và backfill những graded completion trước cutover theo [ERD](04-database-design.md).
+3. Mỗi learner/meaning có một marker kho từ. Auto-save dùng insert-if-absent, giữ nguyên marker active đã có và tombstone do learner bỏ lưu. Explicit save có thể restore, lịch ôn giữ độc lập. Nếu kho từ thay đổi tại completion, `new_saved_count` là số row vừa tạo và được ghi cùng immutable receipt.
+4. Learner có thể chọn nghĩa và hướng ôn để gọi enroll. Khóa learner/meaning/direction tạo một thẻ cho cùng hướng và preserve lịch khi enroll lại. Hoàn thành hoặc làm lại bài typing không tạo thẻ đến hạn, không cập nhật trạng thái ghi nhớ và không tăng số lượt ôn.
 
 ```text
 grade_typing(raw, references):
@@ -57,10 +89,24 @@ grade_typing(raw, references):
 submit(run, cmd, key):
   in one transaction:
     replay or reserve key
-    lock run and validate owner/state/revision/current_item
+    lock run and validate owner/state/revision/current_item and pinned lane
     grade using run's published immutable version
-    append attempt; apply mode terminal/retry policy and increment revision
+    append attempt with assistance snapshot
+    apply mode terminal/retry policy and increment revision
     write receipt
+  return receipt
+
+complete(run, expected_revision, key):
+  in one transaction:
+    replay or reserve key; lock owned run
+    if already completed: return stored receipt
+    require revision matches and every required item is terminal for the lane
+    calculate grading metrics from required items and first valid attempts
+    lock lesson progress, upsert one run outcome and apply daily distinct counts
+    xp_delta = insert_first_eligible_xp_grant_if_absent()
+    if vocabulary integration enabled and lane is graded:
+      new_saved_count = insert_missing_authored_meanings_for_required_items()
+    mark run completed and persist receipt with progress, XP and vocabulary snapshot
   return receipt
 ```
 
@@ -75,6 +121,15 @@ submit(run, cmd, key):
 | ENG-T07 | Submit accepted rồi timeout, retry same key; đổi body cùng key | Same attempt id, không double; 409 body conflict. |
 | ENG-T08 | Hai tabs cùng revision, hint và submit; giới hạn reveal; reload sau pass | Một command chuyển revision, stale 409; không lộ answer trước policy; cursor sau reload theo server. |
 | ENG-T09 | Publish mới khi có run; input theo bản cũ | Chấm version đã pin; run mới lấy version mới. |
+| ENG-T10 | Default ba difficulty, listen basic, listen_speak trước/sau V1 | Sequence đúng loại và order theo ma trận. Lane không hợp lệ 422. Fixture lane nghe audio thiếu không publish. |
+| ENG-T11 | Hai request Start khác key, cùng lane, và Start lane khác | Cùng lane trả một active run, khác lane khác run. Lượt non-typing có difficulty null cũng chỉ một active theo mode. |
+| ENG-T12 | Resume đã completed, replay khi active, tiếp tục bản cũ | Default trả completed receipt, replay conflict nếu còn active, replay sau complete giữ lịch sử. Bản cũ còn quyền resume qua ID. |
+| ENG-T13 | Hai mục pass lần đầu unassisted, một pass sau retry, một pass sau nudge, một reveal | Completion 5/5; first-attempt 40%, terminal 80%, assisted 2, revealed 1, mastery false, XP 0. |
+| ENG-T14 | Bốn mục pass lần đầu unassisted và một pass sau retry | First-attempt 80%, terminal 100%, mastery true. Một run 3/4 lần đầu và mọi mục pass unassisted vẫn đủ XP dù mastery false. |
+| ENG-T15 | Đồng thời hoàn tất hai lane/version đủ điều kiện cùng lesson trong một ngày | Hai completion receipt hợp lệ, lesson/day count tăng một, XP tổng tăng +10, không grant trùng khi replay. |
+| ENG-T16 | Speech người học từ chối mic rồi tự xác nhận mọi mục | Có completion, không có dạng số cho accuracy/terminal, mastery null, XP 0, kho từ không đổi. |
+| ENG-T17 | Hai exercise trùng nghĩa, nghĩa manual đã lưu, tombstone, optional và speech | Graded auto-save chỉ insert các target khả dụng mới từ required; không thay đổi manual/tombstone; không có SRS card hoặc due khi chưa enroll. |
+| ENG-T18 | Rớt transaction sau khi chuẩn bị XP/kho từ, backfill restart sau mất kết nối | Rollback không để side effect, retry chỉ materialize một lần. Backfill có checkpoint, giữ receipt cũ, tombstone, lịch ôn, history và XP. |
 
 ## Vocabulary và ôn: FR-VOCAB-001, FR-SRS-001
 
@@ -161,7 +216,7 @@ assess_translation(answer, version, want_ai):
 
 | Metric | Nguồn, mẫu số và quy tắc |
 | --- | --- |
-| First-attempt accuracy | Số item pass trên attempt hợp lệ đầu / tổng item có attempt hợp lệ đầu trong cohort. Bỏ no-attempt, không bỏ fail; tách mode/gradable. |
+| First-attempt accuracy | Typing dùng first_attempt_correct_count / graded_count trên tập required graded đã chọn. No-attempt và assisted đóng góp 0. Tách mode/difficulty và version; báo cỡ mẫu. Những engine khác dùng định nghĩa theo bài. |
 | Attempts per item | Tổng attempts accepted / số item có attempt. Validation, replay và hint không tăng. |
 | Completion rate | Distinct completed runs / active runs đã bắt đầu trong window cố định và có follow-up tối thiểu, tách mode. Theo dõi abandon và thời gian theo cohort. |
 | Response time | Elapsed giữa item visible/server start và submit, có idle policy, báo p50/p95, client mốc dùng cho analytics allowlisted, không tin dùng cấp điểm. |

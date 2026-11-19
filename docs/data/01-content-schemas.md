@@ -15,11 +15,13 @@
 
 `course` gồm `key`, `slug`, `title_vi`, `cefr_level`, `objective_vi`, `source_key`. `unit` gồm `key`, `course_key`, `title_vi`, `objective_vi` và `position`. `lesson` có `key`, `unit_key`, `slug`, `kind`, `title_vi`, `cefr_level`, `position`, `estimated_minutes`, `source_key`, `required_exercise_keys` và các mục nội dung riêng theo **kind**. `prerequisites` của lesson chứa `lesson_key` và `policy` thuộc `recommended` hoặc `required`. Định danh bên ngoài giữ ổn định qua các lần biên tập. Bản import vào môi trường khác nhận ID nội bộ mới và resolve theo khóa. Import bản đã công bố tạo phiên bản nháp mới. Bài học xuất bản đóng băng phiên bản, thứ tự và đáp án.
 
+Lesson typing khai báo `typing_variants:[{mode,difficulty}]` với cặp duy nhất theo [ma trận engine](../architecture/06-exercise-engines.md#mode-difficulty-và-lựa-chọn-item). Tập `required_exercise_keys` xác định candidate trước khi lọc loại prompt và sắp `position`. Validate non-empty cho từng lane, cue/bản dịch dùng trong default và audio ready có quyền cho listen/listen_speak. `vocabulary_target_sense_keys` của exercise là danh sách cặp khóa nguồn `{lexeme_key,sense_key}` được tác giả chọn. Resolver kiểm nghĩa khả dụng và provenance, nối với UUID nghĩa bằng FK trước khi publish. Giữ liên kết theo version, kể cả khi cùng khóa xuất hiện ở nhiều prompt. Mục từ dùng để tra cứu chung có thể vẫn ở `lexeme_keys` và chỉ vào kho từ nếu có target rõ ràng.
+
 ## Schema theo loại
 
 | Loại | Trường và quan hệ | Kiểm tra |
 |---|---|---|
-| Câu và phrase | `key`, `text_en`, `meaning_vi`, `kind` thuộc `word`, `phrase` hoặc `sentence`, `position`, `source_key`, `lexeme_keys`, `audio_asset_key`, `accepted_answers`. | Tối thiểu một đáp án, lưu nguyên dạng và tính chuẩn hóa khi xác nhận phiên bản. Cảnh báo trùng sau normalize. Variant chỉ dùng khi giáo viên xác nhận cùng mục tiêu. Giới hạn độ dài theo hợp đồng engine. |
+| Câu và phrase | `key`, `text_en`, `meaning_vi`, `kind` thuộc `word`, `phrase` hoặc `sentence`, `position`, `source_key`, `lexeme_keys`, `vocabulary_target_sense_keys`, `audio_asset_key`, `accepted_answers`. | Tối thiểu một đáp án cho bài graded; tính chuẩn hóa khi xác nhận phiên bản, giữ nguyên biểu diễn gốc. Cảnh báo trùng sau normalize. Cặp target trùng cùng exercise bị từ chối khi nhập. Chấm theo mục tiêu và giới hạn độ dài của engine. |
 | Lexeme, nghĩa và bộ từ | `key`, `lemma`, `language`, `pos`, `forms`, `cefr_level`, `topic_keys`, `pronunciations`, `meanings`. Nghĩa gồm `sense_key`, `gloss_vi`, `definition_en`, `examples`, `related_sense_keys` tùy chọn. Bộ từ có khóa, tên, cấp, chủ đề và danh sách sense theo thứ tự. | POS từ danh mục đã chốt, nghĩa tiếng Việt có nội dung, sense ID giữ ổn định. `pronunciations` phân biệt en-US và en-GB và có IPA hoặc audio khi khả dụng. Một lexeme theo locale, lemma đã normalize và POS. Nghĩa đồng hình tách bằng `sense_key`. |
 | Grammar | `topic_key`, `cefr_level`, `title_vi`, `objective_vi`, `sections` có heading/text/example, `exercise_keys`. Quiz có `key`, `type`, `position`, prompt, option keys, answer key hoặc alternatives, `explanation_vi`. | Nguồn văn bản có markup giới hạn. Bài trắc nghiệm có ít nhất hai lựa chọn, đáp án tham chiếu đúng mục và có giải thích. Bài điền có ít nhất một đáp án. |
 | Reading | `title_en`, `cefr_level`, `segments` gồm `key`, `position`, `text_en`, `translation_vi`, `lexeme_keys`, `comprehension_exercise_keys`, `source_key`. | Mỗi segment cặp EN–VI ở cùng position. Quyền dịch cần nằm trong hồ sơ nguồn. Các quiz liên kết tới segment phiên bản hiện tại. |
@@ -35,10 +37,10 @@ Tiếng Việt và tiếng Anh dùng UTF-8/NFC. Giữ chữ hoa, dấu câu và 
 
 | Bảng nhập | Cột bắt buộc | Cột tùy chọn |
 |---|---|---|
-| Sentences | `key,lesson_key,position,kind,text_en,meaning_vi,source_key` | `audio_asset_key`, `accepted_answers_json`, `lexeme_keys_json` |
+| Sentences | `key,lesson_key,position,kind,text_en,meaning_vi,source_key` | `audio_asset_key`, `accepted_answers_json`, `lexeme_keys_json`, `vocabulary_target_sense_keys_json` |
 | Vocabulary | `key,lemma,language,pos,sense_key,gloss_vi,cefr_level,source_key` | `definition_en`, `ipa_en_us`, `ipa_en_gb`, `audio_en_us_asset_key`, `audio_en_gb_asset_key`, `examples_json`, `topic_keys_json` |
 
-Nhập CSV ánh xạ về cùng mô hình kiểm duyệt với JSON. Giá trị bắt đầu bằng ký tự công thức vẫn là text trong mô hình. Chức năng xuất CSV cần escape cho ứng dụng bảng tính để giảm nguy cơ thực thi công thức. Gói thử nghiệm chọn giới hạn khởi đầu 10 MB phần văn bản và 5.000 bản ghi trước khi benchmark, media tải riêng đến khu vực cách ly.
+Nhập CSV ánh xạ về cùng mô hình kiểm duyệt với JSON. Mode/difficulty được đặt ở metadata lesson. Giá trị bắt đầu bằng ký tự công thức vẫn là text trong mô hình. Chức năng xuất CSV cần escape cho ứng dụng bảng tính để giảm nguy cơ thực thi công thức. Gói thử nghiệm chọn giới hạn khởi đầu 10 MB phần văn bản và 5.000 bản ghi trước khi benchmark, media tải riêng đến khu vực cách ly.
 
 ## Fixture nguyên bản để xây MVP
 
@@ -50,8 +52,9 @@ Chủ điểm A1 **Tại quầy cà phê**, source key `original.a1.cafe`, tác 
 | Unit | `a1.everyday.cafe` | Chương 1, gồm typing và một lần ôn vocab. |
 | Lesson / typing word | `a1.cafe.order` / `a1.cafe.small` | `small` / “nhỏ”, thứ tự 1, nhãn tính từ, audio en-US khi được sản xuất. |
 | Typing phrase | `a1.cafe.small_tea` | `a small tea` / “một ly trà nhỏ”, thứ tự 2. |
-| Typing sentence | `a1.cafe.order_tea` | `I would like a small tea.` / “Tôi muốn một ly trà nhỏ.”, thứ tự 3. Ghim mục “tea” và “small”. |
+| Typing sentence | `a1.cafe.order_tea` | `I would like a small tea.` / “Tôi muốn một ly trà nhỏ.”, thứ tự 3. Target explicit `tea.n.drink` và `small.adj.size`; bản fixture bật listen nâng cao sau khi có audio được phép. |
 | Vocabulary sense | `tea.n.drink` | `tea`, danh từ, “trà” trong nghĩa đồ uống, IPA `/tiː/`, ví dụ nguyên bản `My tea is warm.` |
+| Vocabulary sense | `small.adj.size` | `small`, tính từ, “nhỏ” theo kích thước. Gắn cùng nghĩa vào prompt từ `a1.cafe.small` để kiểm auto-save trùng. |
 | Đầu vào QA | cùng lesson/run | Câu chính xác, đổi hoa và dấu câu, bỏ `small`, thêm `hot`, đổi `small` thành `large`, input rỗng, hai tab submit trùng, đóng và quay lại. |
 | Lỗi dữ liệu | cùng package key mới | Hai position trùng, audio không có hồ sơ quyền, thiếu bản dịch, digest bị sai, source key không tồn tại, hai lesson tạo chu kỳ prerequisite. |
 

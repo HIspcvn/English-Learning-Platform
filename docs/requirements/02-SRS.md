@@ -45,10 +45,10 @@ Mọi FR bên dưới là yêu cầu của nền tảng mới. Nghiên cứu ghi
 **Ưu tiên và kế hoạch** P0 · S2
 
 - **Actor, điều kiện và kích hoạt** Learner đã xác thực mở roadmap và chọn bài đã xuất bản.
-- **Luồng chính** Hiện khóa theo CEFR, chương theo thứ tự, trạng thái bài và đề xuất kế. Chọn bài để xem thành phần, độ dài và tiến độ.
+- **Luồng chính** Hiện khóa theo CEFR, chương theo thứ tự, trạng thái bài và đề xuất kế. Chọn bài để xem thành phần, độ dài, tiến độ theo từng tổ hợp và tổ hợp đã READY của phiên bản hiện tại.
 - **Luồng thay thế và lỗi** Xem lại bài đủ quyền hoặc tiếp tục run. Báo empty khi cấp chưa có nội dung. Stale/withdrawn có thông báo và đường tới bài thay thế.
-- **Input, output, validation và UI states** Nhận khóa/chương hoặc lessonId. Trả metadata, phiên bản hoạt động, khả năng bắt đầu, và dữ liệu progress của chính người học.
-- **Business rules, persistence và phụ thuộc** Lưu version bài, quan hệ curriculum và enrollment nếu đã chọn. Cổng máy chủ xác nhận availability. Phụ thuộc CMS và Progress.
+- **Input, output, validation và UI states** Nhận khóa/chương hoặc lessonId. Trả metadata, phiên bản hiện hành, khả năng bắt đầu và tiến độ của chính người học. Preview bài Gõ dùng `typing_variants` của bản hiện hành và `active_runs` của learner trên các version còn quyền.
+- **Business rules, persistence và phụ thuộc** Lưu version bài, quan hệ curriculum và enrollment nếu đã chọn. Máy chủ đánh giá prerequisite của bài độc lập với mode/difficulty. Chính sách khuyến nghị cho phép mở, prerequisite bắt buộc phải đạt. Media và nội dung READY quyết định tổ hợp khả dụng. Phụ thuộc CMS và Progress.
 - **Chấp nhận** Mở lesson đủ quyền từ roadmap. Bài draft/unpublished không hiện trong API learner. Version đang làm được ghim khi có phát hành mới.
 - **Evidence và xác minh** PROPOSED. Lộ trình và dashboard trong nghiên cứu. [RT-13](../research/06-evidence-and-screenshots.md#rt-13) · [CV-09](../research/06-evidence-and-screenshots.md#cv-09)
 
@@ -59,45 +59,68 @@ Mọi FR bên dưới là yêu cầu của nền tảng mới. Nghiên cứu ghi
 - **Actor, điều kiện và kích hoạt** Editor, Reviewer hoặc Admin đã xác thực vào CMS.
 - **Luồng chính** Editor tạo nháp hoặc nạp CSV/JSON staging, sửa lỗi theo dòng và xin duyệt. Reviewer khác tác giả duyệt. Admin publish bản đã duyệt hợp lệ.
 - **Luồng thay thế và lỗi** Import lỗi giữ staging và bản public. Approve có thể yêu cầu sửa với lý do. Content bị thu hồi xử lý độc lập với cập nhật version mới.
-- **Input, output, validation và UI states** Schema, charset, locale, CEFR, media, rights, thứ tự bài, đáp án, edit version hợp lệ. Trả báo cáo lỗi, revision và trạng thái kiểm duyệt.
+- **Input, output, validation và UI states** Schema, charset, locale, CEFR, media, rights, thứ tự bài, đáp án, edit version hợp lệ. Typing khai báo cặp `typing_variants`, loại prompt, cờ required, position và `vocabulary_target_meaning_ids` đã resolve. Publish kiểm tra tổ hợp, chuỗi mục và audio bắt buộc. Trả báo cáo lỗi, revision và trạng thái kiểm duyệt.
 - **Business rules, persistence và phụ thuộc** Lưu import, draft, review, published version bất biến, license và audit. Publish transaction, optimistic edit version và replay an toàn. Phụ thuộc import/media.
 - **Chấp nhận** Import có lỗi dòng kèm lý do, không publish. Reviewer khác tác giả approve. Hai publish đồng thời chỉ tạo một version active.
 - **Evidence và xác minh** PROPOSED. CMS gốc tùy quyền, cần xem giới hạn nghiên cứu.
 
 ### FR-TYPE-001 · Gõ từ, cụm và câu
 
-**Ưu tiên và kế hoạch** P0 · S3
+**Ưu tiên và kế hoạch** P0 · S3 cho văn bản. P1 · S9 cho Nghe & nói.
 
 - **Actor, điều kiện và kích hoạt** Learner mở bài Gõ, lesson đã phát hành và được phép truy cập.
-- **Luồng chính** Bắt đầu/tiếp tục run, chọn điều khiển audio, đọc prompt, nhập và nộp, xem căn chỉnh từ, thử lại hoặc đi câu tiếp, hoàn tất rồi xem kết quả.
-- **Luồng thay thế và lỗi** Gợi ý ngắn tối đa 1. Trong practice xem đáp án sau ít nhất 2 lần sai hợp lệ, item kết thúc dạng assisted. Nếu lỗi mạng giữ text, retry cùng khóa. Khi reload lấy lại vị trí và phản hồi server.
-- **Input, output, validation và UI states** Input text và item/version expected hợp lệ, rejection khi rỗng. Dùng policy normalization của version. Trả feedback đúng/sai/thiếu/thừa, trạng thái attempt, cursor và progress.
-- **Business rules, persistence và phụ thuộc** Giữ kết quả lần nộp, hint/reveal, run pin version, completion idempotent. Phụ thuộc Catalog, audio và Progress.
-- **Chấp nhận** Ca thường, sai/thiếu/thừa từ, chữ hoa/dấu, rỗng, Enter, reload, complete/reopen có kết quả trong test matrix. Phát sinh đúng một completion.
+- **Luồng chính** Chọn `mode` và `difficulty` độc lập. Mặc định cho prompt đã biên tập và có thể phát audio, Nghe phát audio để người học gõ, Nghe & nói phát mẫu để ghi và nghe lại cục bộ rồi tự xác nhận đã luyện. Mỗi run ghim version và danh sách mục đã chọn cùng ordinal.
+- **Luồng thay thế và lỗi** Một nudge tối đa cho mục văn bản giữ cursor. Reveal sau ít nhất hai lần sai hợp lệ ghi terminal `revealed` có trợ giúp và cho sang mục kế. Lỗi mạng giữ input và retry cùng khóa. Reload dùng cursor, trạng thái mục và phản hồi server. Khi mic không sẵn sàng, cho phát mẫu và tự xác nhận. Khi rời màn, dừng và giải phóng tài nguyên ghi âm cục bộ.
+- **Input, output, validation và UI states** `POST /lesson-runs` nhận lesson, mode, difficulty và intent `resume` hoặc `replay`. Kiểm tra tổ hợp, quyền, prerequisite và READY. Attempt nhận item ID, revision cùng text hoặc `practice_ack` theo mode. Từ chối text rỗng và payload sai kiểu. Trả feedback, cursor, progress và summary.
+- **Business rules, persistence và phụ thuộc** Một run active cho mỗi learner, lesson, version, mode, difficulty. Một run giữ nguyên tổ hợp. `resume` trả run active hoặc kết quả gần nhất của version hiện tại và chỉ tạo run khi cả hai vắng. `replay` là hành động tường minh sau completion cùng tổ hợp. Run active thuộc version cũ resume theo run ID còn quyền. Completion và mastery chỉ áp dụng cho tổ hợp đã luyện, kể cả Nâng cao. Attempt và hint có lịch sử bất biến. Completion kiểm tra toàn bộ mục bắt buộc ở trạng thái cuối và trả receipt idempotent.
+- **Chấp nhận** Test đúng/sai/thiếu/thừa/rỗng, Enter với IME, tổ hợp hợp lệ và không hợp lệ, thiếu audio, độ độc lập giữa các tổ hợp, reload và version mới, complete đồng thời và replay tường minh. Mỗi run có đúng một receipt và mỗi bài có tối đa một award XP cơ bản cho learner.
 - **Evidence và xác minh** PROPOSED. Thực nghiệm Gõ câu trong nghiên cứu và [engine](../architecture/06-exercise-engines.md). [RT-14](../research/06-evidence-and-screenshots.md#rt-14) · [RT-15](../research/06-evidence-and-screenshots.md#rt-15) · [RT-16](../research/06-evidence-and-screenshots.md#rt-16) · [RT-17](../research/06-evidence-and-screenshots.md#rt-17) · [RT-19](../research/06-evidence-and-screenshots.md#rt-19)
+
+#### Ma trận Gõ câu
+
+| Cách luyện | Cơ bản · `basic` | Trung cấp · `intermediate` | Nâng cao · `advanced` |
+|---|---|---|---|
+| Mặc định · `default` | MVP · từ, cụm, câu | MVP · từ, câu | MVP · câu |
+| Nghe · `listen` | Không hỗ trợ | Không hỗ trợ | MVP · câu có audio READY |
+| Nghe & nói · `listen_speak` | Không hỗ trợ | Không hỗ trợ | V1 · câu có audio READY và tự xác nhận |
+
+Biên tập viên khai báo tổ hợp, loại prompt, mục bắt buộc và thứ tự biên soạn trong version đã xuất bản. Runtime lọc các mục bắt buộc theo loại prompt của tổ hợp, sắp theo position tăng dần và ghim ordinal vào run. Tổ hợp rỗng hoặc thiếu tài nguyên bắt buộc có trạng thái chưa sẵn sàng.
+
+#### Chỉ số Gõ câu và liên kết XP
+
+| Khái niệm | Quy tắc |
+|---|---|
+| First Attempt Accuracy | Số mục văn bản bắt buộc có lần nộp hợp lệ đầu tiên đúng trước trợ giúp chia cho toàn bộ mục văn bản bắt buộc. Mục chưa nộp, reveal hoặc lần đầu có trợ giúp đóng góp 0. |
+| Final Completion | Tất cả mục bắt buộc của run ở trạng thái cuối. Với văn bản là passed hoặc revealed. Với Nghe & nói là self_ack. |
+| Assisted Attempt | Nộp hợp lệ sau khi dùng nudge cho mục đó. Nudge đánh dấu trợ giúp cả khi nộp đúng sau nhiều lần thử. |
+| Reveal Answer | Lệnh trợ giúp riêng kết thúc mục dạng revealed. Item này không phải một lần nộp đúng và có giá trị 0 trên terminal score. |
+| Terminal Score | Số mục văn bản bắt buộc kết thúc đúng chia cho tổng mục văn bản bắt buộc. Đúng sau retry hoặc nudge vẫn đóng góp 1. |
+| Mastery | Toàn bộ mục văn bản bắt buộc kết thúc đúng và không trợ giúp, với First Attempt Accuracy tối thiểu 80%. Lưu theo version, mode, difficulty. |
+| XP Eligibility | Run văn bản hoàn tất với toàn bộ mục bắt buộc đúng và không trợ giúp. Retry sai rồi sửa đúng vẫn xét đủ điều kiện. Award 10 XP một lần theo user và lesson, kể cả khi tổ hợp hoặc version khác cũng đủ điều kiện. |
+| Nghe & nói | Tự xác nhận có thể hoàn tất run. First Attempt Accuracy và Terminal Score là null. Mastery và XP không áp dụng. |
 
 ### FR-PROG-001 · Tiến độ, buổi học và mục tiêu
 
 **Ưu tiên và kế hoạch** P0 · S4
 
 - **Actor, điều kiện và kích hoạt** Learner vào /dashboard hoặc /progress sau khi học, hoặc sửa mục tiêu tại thiết lập.
-- **Luồng chính** Hiển thị bài kế, lịch sử, bài xong, phút hôm nay, mục tiêu và số đến hạn khi SRS sẵn sàng. Từ Sprint 4, mục tiêu phút/ngày có thể cập nhật ở dashboard hoặc Settings. Mở thẻ để vào đúng module.
+- **Luồng chính** Hiển thị bài kế, lịch sử, completion và mastery theo tổ hợp, phút hôm nay, XP cá nhân, mục tiêu và số đến hạn khi SRS sẵn sàng. Từ Sprint 4, mục tiêu phút/ngày có thể cập nhật ở dashboard hoặc Settings.
 - **Luồng thay thế và lỗi** Tài khoản mới có metric 0 và CTA. Không tính idle/thời gian từ client chưa được xác thực. Lỗi từng thẻ có retry riêng, thông báo trạng thái khi muộn.
 - **Input, output, validation và UI states** Input thành quả server hoặc mục tiêu đã xác thực, timezone IANA. Trả ngày kỳ vọng, minutes/completion còn thiếu, resume và trend.
-- **Business rules, persistence và phụ thuộc** Hiệu ứng unique theo sự kiện, ghi ngày local tại thời điểm phát sinh, không tính lại quá khứ khi đổi timezone. Phụ thuộc run, account, lịch SRS.
-- **Chấp nhận** Hai request complete trùng chỉ có một effect. Qua nửa đêm sai khác theo zone đúng. Resume đi đúng run.
+- **Business rules, persistence và phụ thuộc** Receipt duy nhất theo run. Lịch sử đếm completion của từng run thật. Bộ đếm hôm nay đếm distinct lesson theo user, local date và lesson, kể cả replay hoặc đổi độ khó trong một ngày. Ngày local chốt khi phát sinh. Đọc tổng XP từ ledger. Phụ thuộc run, account, lịch SRS.
+- **Chấp nhận** Hai request complete trùng chỉ có một receipt. Hai run cùng lesson và ngày cho hai bản ghi lịch sử và một bài trong mục tiêu. Qua nửa đêm theo zone đúng. Resume đi đúng run.
 - **Evidence và xác minh** PROPOSED. Dashboard, roadmap và progress quan sát được. [RT-05](../research/06-evidence-and-screenshots.md#rt-05) · [RT-06](../research/06-evidence-and-screenshots.md#rt-06) · [RT-19](../research/06-evidence-and-screenshots.md#rt-19)
 
 ### FR-VOCAB-001 · Bộ từ và danh sách đã lưu
 
 **Ưu tiên và kế hoạch** P0 · S5
 
-- **Actor, điều kiện và kích hoạt** Learner mở bộ từ, chi tiết từ hoặc dùng lưu từ ngữ cảnh khi Dictionary phát hành.
-- **Luồng chính** Duyệt bộ theo chủ đề hoặc cấp, mở sense, nghĩa Việt, IPA, ví dụ và audio nếu có. Thêm vào danh sách hoặc bộ cá nhân. Chọn Đưa vào ôn và chiều ôn để tạo card.
+- **Actor, điều kiện và kích hoạt** Learner hoàn tất bài Gõ có chấm, mở bộ từ hoặc mục từ, hoặc lưu từ ngữ cảnh khi Dictionary phát hành.
+- **Luồng chính** Từ S5, completion Gõ có chấm tự lưu meaning IDs đã biên tập cho các mục bắt buộc trong run đã ghim, kể cả run có trợ giúp. Duyệt bộ theo chủ đề/cấp, mở nghĩa, IPA, ví dụ và audio nếu có. Chọn Đưa vào ôn và chiều ôn để tạo card tường minh.
 - **Luồng thay thế và lỗi** Lưu lại idempotent. Chưa có từ thì mẫu empty với lối quay về catalog. Audio hỏng có nhãn thử lại, nghĩa vẫn sẵn.
 - **Input, output, validation và UI states** Input deckId, lexeme/sense ID hợp lệ và quyền nội dung. Trả thẻ, count và trạng thái đã lưu.
-- **Business rules, persistence và phụ thuộc** Lưu marker người học/sense và thành viên bộ cá nhân. Bỏ lưu hoặc gỡ khỏi bộ giữ thẻ và lịch sử ôn. SRS sở hữu lịch học. Phụ thuộc Catalog, media, Dictionary khi có.
-- **Chấp nhận** Lưu cùng sense hai lần chỉ có một marker. Đưa vào ôn cùng sense và chiều chỉ tạo một card cho người học. Empty có lối thêm từ.
+- **Business rules, persistence và phụ thuộc** Dedupe theo user và meaning. Bỏ lưu giữ tombstone để backfill hoặc completion sau không tự khôi phục. Lưu thủ công có thể khôi phục. Bỏ lưu hoặc gỡ khỏi bộ giữ thẻ và lịch sử ôn riêng. S5 backfill completion văn bản đã có theo completed_at và run_id trước khi mở auto-save. Demo và Nghe & nói nằm ngoài nguồn auto-save. SRS sở hữu lịch học.
+- **Chấp nhận** Complete đồng thời, replay và lưu từ cùng sense qua nhiều bề mặt chỉ có một marker. Sau bỏ lưu, hoàn thành bài khác cùng meaning giữ tombstone. Collection thay đổi không tự ghi lịch ôn. Ghi danh cùng sense và chiều chỉ tạo một card.
 - **Evidence và xác minh** PROPOSED. Khảo sát Từ vựng và modal từ điển MV-17. [CV-01](../research/06-evidence-and-screenshots.md#cv-01) · [CV-03](../research/06-evidence-and-screenshots.md#cv-03) · [CV-04](../research/06-evidence-and-screenshots.md#cv-04) · [MV-17](../research/06-evidence-and-screenshots.md#mv-17)
 
 ### FR-SRS-001 · Ôn giãn cách
@@ -220,16 +243,16 @@ Mọi FR bên dưới là yêu cầu của nền tảng mới. Nghiên cứu ghi
 - **Chấp nhận** Double click một job, provider lỗi fallback, dữ liệu bị xóa chặn phát lại, test đánh giá bao phủ dịch thiếu nhiều và prompt injection.
 - **Evidence và xác minh** PROPOSED. MV-03/07 minh họa nhu cầu, kiến trúc nhà cung cấp là đề xuất. [MV-03](../research/06-evidence-and-screenshots.md#mv-03) · [MV-07](../research/06-evidence-and-screenshots.md#mv-07)
 
-### FR-GAME-001 · XP, streak và thành tích
+### FR-GAME-001 · XP cơ bản, streak và thành tích
 
-**Ưu tiên và kế hoạch** P2 · S11
+**Ưu tiên và kế hoạch** P0 · ledger XP cơ bản S3, hiển thị S4. P2 · streak, leaderboard và thành tích S11.
 
 - **Actor, điều kiện và kích hoạt** Learner hoàn tất hoạt động đủ điều kiện.
-- **Luồng chính** Server ghi XP theo event, tính streak theo ngày địa phương và gắn thành tích có nguồn sự kiện. Dashboard mở lịch sử và điều kiện.
+- **Luồng chính** Server ghi 10 XP cho lần hoàn tất Gõ văn bản đủ điều kiện đầu tiên của một learner đối với một lesson. Summary trả delta. Dashboard từ S4 hiện tổng XP cá nhân. V2 tính streak theo ngày địa phương, gắn thành tích có nguồn sự kiện và có leaderboard theo tùy chọn khi ra mắt.
 - **Luồng thay thế và lỗi** Hiển thị zero, ngày đứt chuỗi với cách bắt đầu lại. Retry và sửa lỗi không cộng thêm XP ngoài event policy.
 - **Input, output, validation và UI states** Input domain event chuẩn, timezone snapshot. Output ledger summary, ngày liên tiếp và achievement.
-- **Business rules, persistence và phụ thuộc** Ledger append-only, event key unique, quy tắc có phiên bản. Phụ thuộc Progress.
-- **Chấp nhận** Trùng hoàn thành không nhân XP, hai khóa ngày liên tiếp đúng theo múi giờ, badge chỉ cấp một lần.
+- **Business rules, persistence và phụ thuộc** Ledger append-only. Mã nguồn MVP là `typing_first_eligible_completion`, khóa ngữ nghĩa user và lesson dùng chung giữa các version, mode và difficulty. Công thức eligibility ở FR-TYPE-001. V2 thêm nguồn riêng và giữ ledger gốc.
+- **Chấp nhận** Hoàn tất có trợ giúp ghi 0 XP. Cùng learner hoàn tất đủ điều kiện nhiều biến thể của cùng bài chỉ nhận 10 XP một lần. Hai ngày liên tiếp đúng theo múi giờ và badge cấp một lần khi V2 mở.
 - **Evidence và xác minh** PROPOSED. Dashboard/xếp hạng/streak nghiên cứu. [RT-05](../research/06-evidence-and-screenshots.md#rt-05) · [RT-10](../research/06-evidence-and-screenshots.md#rt-10)
 
 ### FR-SET-001 · Thiết lập và quyền riêng tư

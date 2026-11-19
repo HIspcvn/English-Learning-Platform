@@ -6,8 +6,8 @@
 
 Học deck gốc và ôn từ đến hạn với lịch nhất quán.
 
-- **Phạm vi** Deck, word details, flashcards, lưu từ và SRS bốn mức.
-- **Tiền điều kiện và phụ thuộc** [Sprint 02](sprint-02.md) mở đường cho deck và scheduler. Tích hợp vào dashboard sau [Sprint 04](sprint-04.md), trước cổng MVP.
+- **Phạm vi** Deck, chi tiết nghĩa, tự lưu từ khi hoàn tất Gõ câu, ghi danh ôn theo chiều và SRS bốn mức.
+- **Tiền điều kiện và phụ thuộc** [Sprint 02](sprint-02.md) cho stable meaning IDs và deck. Auto-save/backfill cần completion văn bản của [Sprint 03](sprint-03.md). Tích hợp dashboard sau [Sprint 04](sprint-04.md), trước cổng MVP.
 - **Tính năng** FR-VOCAB-001, FR-SRS-001.
 - **Đặc tả giao diện** [SRS](../requirements/02-SRS.md), [API](../architecture/05-api-specification.md), [ERD](../architecture/04-database-design.md).
 
@@ -15,8 +15,8 @@ Học deck gốc và ôn từ đến hạn với lịch nhất quán.
 
 | Lớp | Công việc |
 |---|---|
-| PostgreSQL | Entries/senses/decks/cards/review logs, unique learner+meaning+direction, due index. |
-| Backend | Deck queries, save, due queue, rate and reschedule transaction. |
+| PostgreSQL | Entries, senses, decks, collection markers và tombstones, cards/review logs. Marker unique learner+meaning, card unique learner+meaning+direction. |
+| Backend | Truy vấn deck, lưu thủ công, hook completion, backfill idempotent, ghi danh SRS, due queue, rating và dời lịch. |
 | Frontend | Catalog, word detail, flip/rate, empty due, stats. |
 | Nội dung | Deck A1, ngữ nghĩa VI, IPA và audio có provenance. |
 | Kiểm thử | Concurrent review, backfill, due boundary, streak integration khi có. |
@@ -28,13 +28,13 @@ Học deck gốc và ôn từ đến hạn với lịch nhất quán.
 
 - **Mục tiêu** Dùng chung lexical entry từ deck đến dictionary tương lai.
 - **Tệp và module** apps/api/app/vocabulary, apps/web/app/(learn)/vocabulary, apps/api/alembic/versions
-- **Đầu vào** Manifest entry/sense/audio và deck ordering.
-- **Đầu ra** Deck view, word details, lưu nghĩa idempotent và ghi danh ôn theo chiều đã chọn.
-- **Phụ thuộc** S02-03
+- **Đầu vào** Manifest entry/sense/audio, thứ tự deck, required run-items và liên kết meaning IDs đã ghim.
+- **Đầu ra** Deck, kho từ đã lưu và ghi danh ôn riêng theo chiều. Completion mới trả số mục từ tự lưu thêm khi S5 đã mở.
+- **Phụ thuộc** S02-03 cho catalog. S03-02 cho auto-save và backfill.
 - **Ưu tiên và ước lượng** P0 · 3–4 ngày developer.
-- **Hướng dẫn triển khai** Chuẩn hoá lexical identity và tách senses; gắn danh sách lưu với meaning_id và ghi danh ôn bằng command riêng.
-- **Ca kiểm thử** Một từ nhiều nghĩa, thiếu audio, save lặp, request owner sai.
-- **Nghiệm thu** Cùng learner, nghĩa và chiều dùng chung một thẻ khi xuất phát từ nhiều màn hình.
+- **Hướng dẫn triển khai** Lấy meaning IDs từ các mục bắt buộc của run văn bản hoàn tất, tách demo và Nghe & nói. Dedupe theo user và meaning, dùng insert-on-conflict để giữ tombstone. Backfill theo completed_at và run_id theo lô, checkpoint cùng giao dịch. Trước pilot, kiểm diễn tập staging bằng dữ liệu đại diện. Khi cutover, đợi các transaction complete đang chạy kết thúc rồi trả 503 có Retry-After cho lệnh complete mới chưa commit trong cửa sổ backfill. Giữ replay của receipt đã cấp, dữ liệu run và quyền tiếp tục. Sau khi backfill xong, bật auto-save trong transaction complete và mở kho từ. Giữ bất biến receipt cũ, XP, mục tiêu và lịch sử. Đưa vào ôn là command riêng sau khi người học chọn chiều.
+- **Ca kiểm thử** Một từ nhiều nghĩa, thiếu audio, completion/lưu trùng, race, backfill retry và các completion đồng thời lúc chuyển sang hook live, tombstone, owner sai, collection có đủ từ nhưng due vẫn trống trước ghi danh.
+- **Nghiệm thu** Một marker trên mỗi user/meaning, không khôi phục mục đã chủ động bỏ lưu. Ghi danh cùng chiều chỉ tạo một card. Auto-save có hiệu lực với cả các completion đủ điều kiện trước S5 và sau khi bật.
 - **Commit đề xuất** `feat: add vocabulary decks and saved cards`.
 
 - [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
@@ -77,7 +77,7 @@ Học deck gốc và ôn từ đến hạn với lịch nhất quán.
 
 ## Điều kiện hoàn tất
 
-- **Nghiệm thu sprint** Review hợp lệ tạo một log, due mới phản ánh ngay, reload không nhân đôi hoặc mất kết quả.
+- **Nghiệm thu sprint** Completed run tạo marker theo các nghĩa đã biên tập, danh sách ôn chỉ đổi sau ghi danh. Review hợp lệ tạo một log, due mới phản ánh ngay, reload không nhân đôi hoặc mất kết quả.
 - **Bàn giao** Các task trên đã được review, bản trình diễn staging và bằng chứng kiểm thử đính kèm. Migration có hướng nâng cấp và hướng khôi phục khi sprint thay đổi schema.
 - **Rủi ro dự kiến** Deck có từ đa nghĩa, learner bị nợ ôn quá nhiều và dữ liệu trùng.
 

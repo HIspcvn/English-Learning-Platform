@@ -66,7 +66,7 @@ Mở phản hồi AI opt-in có ngân sách, lưu provenance và rubric ổn đ�
 - **Đầu ra** Async speech/tutor result và kill switch, V2 candidate.
 - **Phụ thuộc** S10-01, S09-02
 - **Ưu tiên và ước lượng** P1 · 4–6 ngày developer.
-- **Hướng dẫn triển khai** Không lưu bản ghi lâu mặc định; tutor chỉ có dữ liệu content đã cấp quyền và không có tool hành động.
+- **Hướng dẫn triển khai** Nếu duyệt speech V2, dùng opt-in riêng và audio có TTL. Kết quả speech là phản hồi tham khảo, giữ nguyên completion, điểm và eligibility của lượt tự luyện V1. Tutor chỉ dùng nội dung đã cấp quyền và trả hướng dẫn trong cuộc hội thoại.
 - **Ca kiểm thử** Audio too long, denied consent, quota, unsafe output, hidden feature flag.
 - **Nghiệm thu** File audio có TTL và UI fallback, tutor chỉ mở sau eval riêng.
 - **Commit đề xuất** `feat: pilot bounded speech and tutor features`.

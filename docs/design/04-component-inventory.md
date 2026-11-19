@@ -11,10 +11,10 @@
 | PageState, PendingIndicator, StatusBanner, ToastRegion · shared | Enum loading/empty/error/success, retry | Một live channel theo khu vực | Không spam trong typing |
 | Button, IconButton, Dialog, Drawer, Popover, Tabs · shared | Các trạng thái primitive | Shadcn/Radix khi phù hợp, label cho icon | Keyboard, touch target, return focus |
 | FiltersToolbar, EntityGrid, CursorPager · catalog | Search, filters, result count/cursor | Request scope theo keys, giữ URL filter hợp lệ | No matches, clear, nhanh đổi query |
-| CourseMap, UnitList, LessonPreview · curriculum | Course, units, lesson status, availableVersion | Server view model, prop progress. Link đến lesson đủ quyền | Khóa, version withdrawn, empty CEFR |
-| NextActionPanel, DailyGoalMeter, ActivityHistory · progress | Hôm nay, streak flag, bài tiếp, history | Read model. Meter có số tuyệt đối và nhãn | 0/goal, midnight, stale |
-| ExerciseShell, ExercisePrompt, ExerciseStepper, RunSummary · learn | Pinned run, item, result | Điều phối renderer trực tiếp theo type/version. Render thông tin hoàn tất | Resume, completion, version mismatch |
-| TypingInput, FeedbackDiff, HintControls · typing | Local input, IME, feedback server | Không chấm authoritative trong browser. Hint/reveal theo quyền server. Giữ input khi lỗi | composition, Enter, căn thiếu/thừa, retry |
+| CourseMap, UnitList, LessonPreview · curriculum | Course, units, lesson status, availableVersion, typing_variants, active_runs | Server view model, link đến lesson hoặc run đủ quyền | Khóa, version thu hồi, empty CEFR |
+| NextActionPanel, DailyGoalMeter, XPBalance, ActivityHistory · progress | Hôm nay, XP server, bài tiếp, history, phase | Read model. Meter có số tuyệt đối và nhãn. Một bài/ngày, lịch sử từng run | 0/goal, midnight, stale |
+| ExerciseShell, ExercisePrompt, ExerciseStepper, RunSummary · learn | Pinned run, item và completion receipt | Điều phối theo kind và tổ hợp đã ghim. Tách score lần đầu/điểm cuối/trợ giúp/mastery/XP. Nút Làm lại gửi intent replay | Resume, completion, version mismatch |
+| TypingVariantPicker, TypingInput, FeedbackDiff, HintControls · typing | Ready pair, prerequisite, local input, IME, feedback server | Hai nhóm chọn tường minh và lý do khóa. Hint/reveal theo quyền server. Giữ input khi lỗi | Labels, composition, Enter, căn thiếu/thừa, retry |
 | MediaPlayer, PlaybackControls, TranscriptCueList · media | Playback time, speeds, cues, activeCue | Time update throttled. Seek theo timestamp, highlight cue. Cleanup media | Seek, caption, lỗi object, mobile |
 | VocabDeckCard, WordDetail, SaveWordControl · vocabulary | Deck, lexeme/sense, saved control | Tách save sense và enrollment theo chiều, invalidate đúng scope | Duplicate save, audio lỗi |
 | Flashcard, ReviewRatingBar, ReviewQueueSummary · review | Card/due, flipped, version | Mặt sau có hành động rõ, rating sau flip, conflict reload | Keyboard, due inclusive, stale |

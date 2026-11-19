@@ -51,8 +51,8 @@ flowchart TD
 | Landing/demo · MVP | `/`, `/demo`, `/legal/*` | Public. Landing có về dashboard sau đăng nhập, demo CTA đăng ký. | FR-LAND-001 |
 | Auth · MVP | `/login`, `/register`, `/verify`, `/recover` | Public. Register chỉ nhập email. /verify đặt tên và mật khẩu qua token. Người học đăng nhập sau verify. Target sau auth thuộc allowlist nội bộ. | FR-AUTH-001 |
 | Onboarding · MVP | `/onboarding` | Learner đã xác minh và đăng nhập, route bắt buộc khi chưa hoàn tất. Chọn CEFR, mục tiêu kỳ thi tùy chọn, múi giờ và vi/en. | FR-AUTH-001 |
-| Home và theo dõi · MVP/V2 | `/dashboard`, `/progress` | Learner. Resume, mục tiêu, due, sau mới XP và streak. | FR-PROG-001, FR-GAME-001 |
-| Lộ trình và run · MVP | `/roadmap`, `/lessons/[lessonId]`, `/learn/[runId]` | Lesson UUID ổn định. Run do learner sở hữu, renderer theo mode, gắn version. Completion có route logic trong run. | FR-CUR-001, FR-TYPE-001 |
+| Home và theo dõi · MVP/V2 | `/dashboard`, `/progress` | Learner. Resume, mục tiêu và XP cá nhân từ S4, due từ S5. Streak và leaderboard opt-in ở V2. | FR-PROG-001, FR-GAME-001 |
+| Lộ trình và run · MVP/V1 | `/roadmap`, `/lessons/[lessonId]`, `/learn/[runId]` | Preview chọn mode/difficulty độc lập và mở đúng run đã ghim version. Completion hiển thị tại cùng URL run. Chỉ Làm lại mới tạo lượt mới sau completion. Nghe & nói mở ở V1. | FR-CUR-001, FR-TYPE-001 |
 | Từ vựng · MVP | `/vocabulary`, `/vocabulary/[deckId]`, `/review` | Learner. Deck detail, bộ đã lưu và hàng đến hạn. | FR-VOCAB-001, FR-SRS-001 |
 | Thiết lập · MVP/V2 | `/settings` | Learner. Preference, mục tiêu phút/ngày từ S4 và yêu cầu quyền dữ liệu sau xác thực lại 10 phút. | FR-SET-001 |
 | CMS · MVP | `/cms`, `/cms/imports/[importId]`, `/cms/lessons/[id]`, `/cms/review` | Staff. Route bảo vệ theo vai trò, hành động publish riêng admin. | FR-CMS-001 |

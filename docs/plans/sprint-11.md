@@ -6,8 +6,8 @@
 
 Khuyến khích duy trì nhịp học bằng tiến độ, mục tiêu và thưởng chống ghi trùng.
 
-- **Phạm vi** XP ledger, daily streak, achievement rules, next recommendation. Social opt-in sau duyệt vận hành.
-- **Tiền điều kiện và phụ thuộc** [Sprint 04](sprint-04.md) cho dữ liệu tiến độ, [Sprint 05](sprint-05.md) cho sự kiện ôn.
+- **Phạm vi** Mở rộng ledger XP cơ bản đã có từ S3 bằng quy tắc thưởng đã duyệt. Thêm streak, achievements, next recommendation và leaderboard opt-in nếu qua duyệt riêng tư/vận hành.
+- **Tiền điều kiện và phụ thuộc** [Sprint 03](sprint-03.md) cho ledger MVP, [Sprint 04](sprint-04.md) cho dữ liệu tiến độ và [Sprint 05](sprint-05.md) cho sự kiện ôn.
 - **Tính năng** FR-GAME-001, FR-PROG-001, FR-SOC-001.
 - **Đặc tả giao diện** [SRS](../requirements/02-SRS.md), [API](../architecture/05-api-specification.md), [ERD](../architecture/04-database-design.md).
 
@@ -15,7 +15,7 @@ Khuyến khích duy trì nhịp học bằng tiến độ, mục tiêu và thư�
 
 | Lớp | Công việc |
 |---|---|
-| PostgreSQL | XP ledger/unique source, awarded achievements, local day activity, optional friendship. |
+| PostgreSQL | Dùng ledger MVP, thêm achievement grants, local-day activity và friendship nếu bật. |
 | Backend | Derive rewards from completion events; ranking and privacy gates if authorized. |
 | Frontend | XP, streak và achievements có nhãn; đề xuất lộ trình; social optional. |
 | Nội dung | Minh bạch quy tắc thưởng và thông báo quyền riêng tư. |
@@ -32,7 +32,7 @@ Khuyến khích duy trì nhịp học bằng tiến độ, mục tiêu và thư�
 - **Đầu ra** XP ledger row, derived streak và achievement grants.
 - **Phụ thuộc** S04-02, S05-02
 - **Ưu tiên và ước lượng** P1 · 3–5 ngày developer.
-- **Hướng dẫn triển khai** Unique event+rule, compute streak qua ngày liên tục, reprocess safe. Persist day attribution.
+- **Hướng dẫn triển khai** Khóa nguồn theo event và rule của các thưởng V2, giữ nguyên award Gõ câu 10 XP từ ledger MVP. Tính streak theo ngày liên tiếp với IANA snapshot đã ghim. Dedupe khi reprocess.
 - **Ca kiểm thử** Dup event, race, future date, DST and rule version.
 - **Nghiệm thu** Replaying backfill leaves totals and achievements unchanged.
 - **Commit đề xuất** `feat: award learning milestones idempotently`.

@@ -10,6 +10,7 @@
 - JSON chỉ cho union theo `kind`, snapshot receipt, rubric, trace tối thiểu và dữ liệu nhập thô ngắn hạn; validate JSON schema trước commit, constraint loại object/array/size ở DB cho điểm nhạy cảm. Chỉ cho phép block được định kiểu, không đưa HTML thô vào DOM.
 - Thời điểm UTC; local activity date tính bằng server từ timezone IANA tại sự kiện và lưu luôn `timezone`. Các ledger và attempts append-only trong thao tác nghiệp vụ. Quy trình xóa/ẩn danh có transaction, quyền riêng và audit.
 - Giai đoạn MVP ưu tiên identity, curriculum, typing, CMS, progress và vocab/SRS. Migrate schema V1/V2 khi feature vào sprint; riêng idempotency, audit, jobs và media dùng khi chức năng tương ứng ra mắt.
+- PostgreSQL hỗ trợ `NULLS NOT DISTINCT` trong unique index. Dùng đặc tính này cho khóa run có difficulty nullable và kiểm trên PostgreSQL thật.
 
 ## Identity, quyền và tùy chọn
 
@@ -39,6 +40,8 @@
 | `content_imports` · import CSV/JSON | `id uuid PK`, `requester_id uuid FK users`, `asset_id uuid FK media_assets`, `schema_version int`, `package_key str`, `source_release str`, `file_sha256 str`, `source_manifest_id uuid FK source_manifests`, `state str`, `report json`, `applied_at ts?` | UQ package_key,source_release; cùng SHA-256 trả import cũ, khác SHA-256 conflict. IDX state,created_at; lock import khi apply; row issues với row/field/code; staging expires; dữ liệu draft, publish qua review riêng. |
 | `exercises` · trình tự và policy | `id uuid PK`, `lesson_version_id uuid FK lesson_versions`, `position int`, `kind str`, `prompt json`, `grader_config json`, `sentence_id uuid? FK sentences`, `required boolean` | UQ version,position và version,id. Exercise kind dạng discriminated union; grader_config server-only. FK composite bắt cùng version nếu dùng sentence. |
 | `sentences` · từ/cụm/câu | `id uuid PK`, `lesson_version_id uuid FK lesson_versions`, `part_kind str` word/phrase/sentence, `english str`, `vietnamese str?`, `ipa str?`, `audio_asset_id uuid? FK media_assets` | UQ version,id; IDX version,part_kind; thẻ audio chỉ từ asset ready; dùng ID ổn định trong version để nối bài. |
+| `typing_variants` · lane mở theo phiên bản | `lesson_version_id uuid FK lesson_versions`, `mode str`, `difficulty str`; PK version,mode,difficulty | CHECK default × basic/intermediate/advanced, listen × advanced, listen_speak × advanced. CMS xác nhận candidate sequence không rỗng theo [Engine](06-exercise-engines.md) và asset sẵn sàng; chuyển phase là gate ứng dụng. Giữ bất biến khi publish. |
+| `exercise_vocabulary_targets` · nghĩa được biên soạn cho từng prompt | `exercise_id uuid FK exercises`, `meaning_id uuid FK vocabulary_meanings`; PK exercise_id,meaning_id | FK giữ identity của nghĩa; dữ liệu kế thừa snapshot của exercise. Chỉ target được tác giả/CMS duyệt. Không suy ra từ token hoặc kết quả tự nhập; meaning archive vẫn giữ identity cho lịch sử. |
 | `grammar_lessons` · lý thuyết | `lesson_version_id uuid PK FK lesson_versions`, `topic_key str`, `blocks json` | IDX topic_key; blocks (rule, note, example vi/en, worked_steps); 1/version, luyện dùng exercises riêng. |
 | `reading_passages` · bài đọc | `lesson_version_id uuid PK FK lesson_versions`, `source_lang str`, `paragraphs json`, `translation_lang str?`, `source_attribution str` | Các block có id/position và tùy chọn bản dịch, lookup từ dựa trên entry link, không chép nguồn trái phép; một snapshot/version. |
 | `translation_exercises` · rubric | `exercise_id uuid PK FK exercises`, `source_lang str`, `target_lang str`, `source_text str`, `reference_answers json`, `rubric json` | Validate mỗi segment của bài có ít nhất một reference và ngôn ngữ khác nhau; với câu đơn dùng một segment cố định; private cho đến reveal. |
@@ -51,17 +54,17 @@
 
 | Bảng / mục đích | Cột, PK, FK và constraint | Index, lifecycle và quy tắc |
 | --- | --- | --- |
-| `lesson_runs` · phiên học | `id uuid PK`, `user_id uuid FK users`, `lesson_id uuid FK lessons`, `lesson_version_id uuid FK lesson_versions`, `mode str`, `status str` active/completed/abandoned, `cursor int`, `revision int`, `started_at ts`, `ended_at ts?` | Composite version thuộc lesson; UQ partial user_id,lesson_id,lesson_version_id,mode where active; IDX user_id,status,updated_at DESC. Pin immutable version và mode. |
-| `run_items` · trình tự đã chọn | `id uuid PK`, `run_id uuid FK lesson_runs`, `exercise_id uuid FK exercises`, `ordinal int`, `status str`, `attempt_count int`, `hint_count int`, `best_score pct?`, `terminal_at ts?` | UQ run_id,ordinal và run_id,id; IDX exercise_id; trạng thái pending/passed/failed_terminal/revealed/skipped theo mode; exercise đúng version, checks ở command + constraint trigger. |
+| `lesson_runs` · phiên học | `id uuid PK`, `user_id uuid FK users`, `lesson_id uuid FK lessons`, `lesson_version_id uuid FK lesson_versions`, `mode str`, `difficulty str?`, `status str` active/completed/abandoned, `cursor int`, `revision int`, `started_at ts`, `ended_at ts?` | FK composite version thuộc lesson. Difficulty khác null đúng khi lesson là typing, kiểm bằng constraint trigger; FK (version,mode,difficulty) đến typing_variants áp dụng khi có difficulty. Unique index partial `NULLS NOT DISTINCT` trên (user_id,lesson_id,lesson_version_id,mode,difficulty) WHERE status='active'. IDX user_id,status,updated_at DESC và user_id,lesson_id,lesson_version_id,mode,difficulty,ended_at DESC. Pin cả hai trục; không đổi lane trong run. |
+| `run_items` · trình tự đã chọn | `id uuid PK`, `run_id uuid FK lesson_runs`, `exercise_id uuid FK exercises`, `ordinal int`, `required boolean`, `graded boolean`, `status str`, `attempt_count int`, `hint_count int`, `assisted_at ts?`, `best_score pct?`, `terminal_at ts?` | UQ run_id,ordinal và run_id,id; IDX exercise_id. Trạng thái pending/passed/failed_terminal/revealed/self_ack/skipped theo policy; typing graded required dùng passed/revealed và speech required dùng self_ack. Thứ tự, required và graded bất biến; exercise phải cùng version và đúng lane. Nudge/reveal đặt assisted_at một lần, còn replay giữ kết quả gốc. |
 | `run_item_drafts` · nháp dịch | `run_item_id uuid PK FK run_items`, `answer json`, `revision int`, `expires_at ts` | IDX expires_at; chỉ owner qua run, bounded data, CAS revision độc lập với run. Dọn khi terminal/complete hoặc hết TTL; không đưa raw draft vào telemetry. |
-| `exercise_attempts` · lịch sử nộp | `id uuid PK`, `run_id uuid`, `run_item_id uuid`, `attempt_no int`, `response json`, `grade json`, `score pct?`, `passed boolean?`, `outcome str`, `grading_version str`, `submitted_at ts`, `duration_ms int?` | FK run_id,run_item_id → run_items; UQ run_item_id,attempt_no; IDX run_id,submitted_at; append-only, nullable score/pass cho needs_review hoặc unscored, không lưu input vượt schema; PII purge policy. |
-| `lesson_completions` · receipt | `run_id uuid PK FK lesson_runs`, `score pct?`, `assisted_count int`, `completed_at ts`, `study_date date`, `timezone str` | Một mỗi run; điểm null khi mode không có item đủ điều kiện tính điểm, vẫn đếm practice completion; bất biến, IDX study_date,completed_at. |
-| `lesson_progress` · latest/best | `user_id uuid FK users`, `lesson_id uuid FK lessons`, `last_run_id uuid? FK lesson_runs`, `last_completed_at ts?`, `first_completed_at ts?`, `best_score pct?`, `completed_runs int`; PK user_id,lesson_id | IDX user_id,last_completed_at DESC; never lower best/first; last run same ownership/lesson. Upsert cùng completion. |
+| `exercise_attempts` · lịch sử nộp | `id uuid PK`, `run_id uuid`, `run_item_id uuid`, `attempt_no int`, `response json`, `grade json`, `score pct?`, `passed boolean?`, `outcome str`, `assisted boolean`, `grading_version str`, `submitted_at ts`, `duration_ms int?` | FK run_id,run_item_id → run_items; UQ run_item_id,attempt_no; IDX run_id,submitted_at. Cờ assisted là snapshot tại thời điểm nộp, giữ lần đầu bất biến. Hints/reveal đổi item và revision; không tạo attempt giả. Nullable score/pass cho needs_review hoặc unscored; PII purge policy. |
+| `lesson_completions` · receipt | `run_id uuid PK FK lesson_runs`, `score pct?`, `assisted_count int`, `typing_metrics json?`, `xp_eligible boolean?`, `xp_delta int?`, `new_saved_count int?`, `progress_snapshot json`, `completed_at ts`, `study_date date`, `timezone str` | Một mỗi run. Với typing giữ snapshot typed về required, graded, first-attempt correct, passed, revealed, acknowledged, mastery. Với speech các trường điểm/mastery null. `xp_delta` 0/10 ở typing, `new_saved_count` ≥0 khi đã bật tích hợp. Snapshot ổn định sau backfill, IDX study_date,completed_at và completed_at,run_id. |
+| `lesson_progress` · latest/best | `user_id uuid FK users`, `lesson_id uuid FK lessons`, `last_run_id uuid? FK lesson_runs`, `last_completed_at ts?`, `first_completed_at ts?`, `best_score pct?`, `completed_runs int`; PK user_id,lesson_id | IDX user_id,last_completed_at DESC. Một identity lesson cho yêu cầu trước và số bài; completed_runs là số receipt distinct, kể cả học lại. Best của lane/version tính từ chính các completion cùng tuple, không dùng aggregate này để xếp mastery. Upsert cùng completion, last run cùng owner/lesson. |
 | `study_sessions` · thời gian | `id uuid PK`, `user_id uuid FK users`, `run_id uuid? FK lesson_runs`, `started_at ts`, `last_signal_at ts`, `ended_at ts?`, `trusted_active_seconds int` ≥0 | IDX user_id,started_at; UQ user_id partial WHERE ended_at IS NULL; bounded interval qua heartbeat, idle cut-off, split ngày/midnight; expire khi bỏ dở. |
 | `daily_goals` · mục tiêu theo hiệu lực | `id uuid PK`, `user_id uuid FK users`, `effective_local_date date`, `minutes int` 5–180 | UQ user_id,effective_local_date; thay hôm nay chỉ khi chính sách cho phép, recommendation chạy lại; giữ history. |
-| `daily_activity` · snapshot tổng ngày | `user_id uuid FK users`, `study_date date`, `timezone str`, `active_seconds int`, `completed_lessons int`, `reviewed_cards int`, `earned_xp int`; PK user_id,study_date | Số đếm ≥0; ghi chung txn hoặc worker idempotent riêng cho time. Duplicate date timezone giữ timezone snapshot đầu ngày, tránh tạo hai row gây double count. |
+| `daily_activity` · snapshot tổng ngày | `user_id uuid FK users`, `study_date date`, `timezone str`, `active_seconds int`, `completed_lessons int`, `reviewed_cards int`, `earned_xp int`; PK user_id,study_date | Số đếm ≥0. Dưới cùng khóa lesson_progress, kiểm receipt trước đó cùng learner/lesson/ngày rồi chỉ tăng completed_lessons khi chưa có. Daily earned_xp chỉ tăng theo grant vừa insert. Giữ timezone snapshot đầu ngày; thời gian có thể cập nhật riêng với idempotency. |
 | `idempotency_records` · command replay | `user_id uuid FK users`, `operation_id str`, `idem_key str`, `body_hash bytea`, `response_status int`, `response_body json`, `expires_at ts`; PK user_id,operation_id,idem_key | IDX expires_at; reservation + mutation + receipt 1 transaction; 409 khác hash; TTL ≥7 ngày. Reply quyền sở hữu recheck. |
-| `xp_ledger` · reward (V2) | `id uuid PK`, `user_id uuid FK users`, `source_type str`, `source_id uuid`, `amount int`, `event_time ts`, `study_date date` | UQ user_id,source_type,source_id; IDX user_id,event_time. Lần hoàn thành đầu dùng source_type lesson_first_completion và source_id lesson_id. Số khác 0, reverse qua event riêng quyền admin. |
+| `xp_ledger` · reward MVP | `id uuid PK`, `user_id uuid FK users`, `source_type str`, `source_id uuid`, `source_run_id uuid? FK lesson_completions(run_id)`, `amount int`, `event_time ts`, `study_date date` | UQ user_id,source_type,source_id; IDX user_id,event_time. MVP chỉ insert +10 cho typing_first_eligible_completion với source_id = lesson_id và source_run_id = run thắng cùng owner/lesson. FK source_run_id deferred để ghi receipt bất biến sau grant trong cùng transaction. Cùng user/lesson có một grant qua các lane/version. V2 có thể thêm source và correction riêng. |
 | `streak_states` · projection (V2) | `user_id uuid PK FK users`, `last_qualified_date date?`, `current_days int`, `longest_days int` | longest≥current≥0; authoritative qualifying dates từ daily_activity; projection rebuild được. |
 | `achievements` · badge cỡ nhỏ (V2) | `id uuid PK`, `code str`, `title str`, `rule json`, `enabled boolean` | UQ code; typed rule version; audit thay đổi. |
 | `user_achievements` · đạt badge (V2) | `user_id uuid FK users`, `achievement_id uuid FK achievements`, `earned_at ts`; PK user_id,achievement_id | IDX achievement_id; cấp trùng idempotent, giữ ngày đầu. |
@@ -71,10 +74,10 @@
 | Bảng / mục đích | Cột, PK, FK và constraint | Index, lifecycle và quy tắc |
 | --- | --- | --- |
 | `vocabulary_entries` · mục từ | `id uuid PK`, `lemma str`, `normalized_lemma str`, `locale str`, `pos str`, `ipa_uk str?`, `ipa_us str?`, `audio_uk_id uuid? FK media_assets`, `audio_us_id uuid? FK media_assets`, `source_ref str`, `license_key str`, `status str` | UQ locale,normalized_lemma,pos; IDX normalized_lemma text_pattern_ops; optional pg_trgm sau benchmark. Dictionary search chỉ published. |
-| `vocabulary_meanings` · sense và ví dụ | `id uuid PK`, `entry_id uuid FK vocabulary_entries`, `sense_key str`, `position int`, `definition_en str?`, `gloss_vi str`, `examples json`, `cefr str?` | UQ entry_id,sense_key và entry_id,position. Change editorial cùng provenance; archive sense khi đã có card, tôn trọng roll forward/snapshot lịch sử. |
+| `vocabulary_meanings` · sense và ví dụ | `id uuid PK`, `entry_id uuid FK vocabulary_entries`, `sense_key str`, `position int`, `definition_en str?`, `gloss_vi str`, `examples json`, `cefr str?`, `archived_at ts?` | UQ entry_id,sense_key và entry_id,position. Sense khả dụng khi entry published, còn quyền và archived_at null. Chỉnh sửa biên tập cùng provenance, archive giữ FK và lịch sử. |
 | `vocab_decks` · taxonomy hoặc nhóm riêng | `id uuid PK`, `owner_user_id uuid? FK users`, `slug str`, `title str`, `scope str`, `cefr str?`, `tag str?`, `status str` | UQ public slug partial, UQ owner,slug khi owner present; IDX scope,cefr; owner private, content editor quản public. |
 | `deck_entries` · thành viên | `deck_id uuid FK vocab_decks`, `meaning_id uuid FK vocabulary_meanings`, `position int`; PK deck_id,meaning_id | UQ deck_id,position; IDX meaning_id; chia sẻ cùng sense giữa deck, không sinh card trùng. |
-| `saved_vocabulary` · lưu cá nhân | `user_id uuid FK users`, `meaning_id uuid FK vocabulary_meanings`, `saved_at ts`, `source str`; PK user_id,meaning_id | IDX user_id,saved_at DESC; save set semantics; bỏ lưu không hủy lịch sử review khi card tách riêng. |
+| `saved_vocabulary` · lưu cá nhân | `user_id uuid FK users`, `meaning_id uuid FK vocabulary_meanings`, `saved_at ts`, `source str` manual/typing, `source_run_id uuid? FK lesson_completions(run_id)`, `removed_at ts?`; PK user_id,meaning_id | IDX partial user_id,saved_at DESC,meaning_id WHERE removed_at IS NULL. Auto-save chỉ insert missing row theo meaning_id tăng dần, giữ metadata manual và tombstone, source_run_id thuộc owner. FK source_run_id deferred. Explicit save xóa tombstone, explicit remove đặt removed_at, cả hai riêng thẻ SRS. |
 | `srs_cards` · lịch ôn hiện có | `id uuid PK`, `user_id uuid FK users`, `meaning_id uuid FK vocabulary_meanings`, `direction str` en_vi/vi_en, `state str` new/learning/review/suspended, `due_at ts`, `repetitions int`, `interval_days int`, `ease numeric(4,2)`, `revision int`, `algorithm_version str` | UQ user_id,meaning_id,direction; IDX partial user_id,due_at,id where state<>'suspended'; row locked khi review. Ease ≥1.30; retry với revision và idem. |
 | `srs_review_logs` · lịch sử | `id uuid PK`, `card_id uuid FK srs_cards`, `card_revision_before int`, `rating str`, `reviewed_at ts`, `due_before ts`, `due_after ts`, `before_state json`, `after_state json`, `algorithm_version str` | UQ card_id,card_revision_before; IDX card_id,reviewed_at; append-only, không backfill số liệu thật từ client clock. |
 
@@ -106,7 +109,9 @@ erDiagram
   LESSONS ||--o{ LESSON_VERSIONS : publishes
   LESSONS ||--o{ LESSON_PROGRESS : aggregates
   LESSON_VERSIONS ||--o{ EXERCISES : contains
+  LESSON_VERSIONS ||--o{ TYPING_VARIANTS : offers
   LESSON_VERSIONS ||--o{ LESSON_RUNS : pins
+  TYPING_VARIANTS o|--o{ LESSON_RUNS : constrains
   LESSON_RUNS ||--o{ RUN_ITEMS : sequences
   RUN_ITEMS ||--o| RUN_ITEM_DRAFTS : drafts
   RUN_ITEMS ||--o{ EXERCISE_ATTEMPTS : receives
@@ -139,10 +144,13 @@ erDiagram
 ```mermaid
 erDiagram
   VOCABULARY_ENTRIES ||--o{ VOCABULARY_MEANINGS : defines
+  EXERCISES ||--o{ EXERCISE_VOCABULARY_TARGETS : authors
+  VOCABULARY_MEANINGS ||--o{ EXERCISE_VOCABULARY_TARGETS : referenced
   VOCAB_DECKS ||--o{ DECK_ENTRIES : arranges
   VOCABULARY_MEANINGS ||--o{ DECK_ENTRIES : uses
   VOCABULARY_MEANINGS ||--o{ SAVED_VOCABULARY : saved
   USERS ||--o{ SAVED_VOCABULARY : saves
+  LESSON_COMPLETIONS o|--o{ SAVED_VOCABULARY : seeds
   VOCABULARY_MEANINGS ||--o{ SRS_CARDS : reviewed
   SRS_CARDS ||--o{ SRS_REVIEW_LOGS : schedules
 ```
@@ -152,6 +160,7 @@ erDiagram
   USERS ||--o{ DAILY_GOALS : sets
   USERS ||--o{ STUDY_SESSIONS : times
   USERS ||--o{ XP_LEDGER : earns
+  LESSON_COMPLETIONS o|--o{ XP_LEDGER : qualifies
   USERS ||--o| STREAK_STATES : projects
   USERS ||--o{ USER_ACHIEVEMENTS : receives
   ACHIEVEMENTS ||--o{ USER_ACHIEVEMENTS : awards
@@ -161,8 +170,9 @@ erDiagram
 
 ## Migration và chứng minh tính nhất quán
 
-1. Dựng schema theo graph identity → media/catalog → curriculum/editorial → learning/progress → vocab/review → V1/V2. Sử dụng migration hai giai đoạn cho circular FKs giữa lesson + current version, hoặc user profile + media.
+1. Dựng schema theo identity → media/catalog và từ vựng biên tập → curriculum/editorial → learning/progress/XP → kho từ/SRS → V1/V2. Sprint 02 tạo identity nghĩa cho target biên tập. Sprint 03 tạo run theo variant và ledger XP. Sprint 05 thêm kho cá nhân và SRS. Sử dụng migration hai giai đoạn cho FK vòng giữa lesson + current version hoặc user profile + media.
 2. Publish: lock lesson, validate version được duyệt và checksum, kiểm asset ready/prerequisite DAG, cập nhật published + pointer + audit/outbox trong một transaction. Truy vấn learner lọc `published` và rescope đúng version. Từ chối cross-version và xóa version còn reference.
 3. Lệnh đồng thời same-key replay, khác payload conflict. Đồng thời với khác key kiểm revision, khóa hàng và unique constraints. Bài đang chạy vẫn chấm đúng snapshot sau publish bản mới. Test hai phiên DB độc lập.
 4. Để migrate khi đang chạy, expand schema và backing index, deploy code tương thích cả hai, backfill theo batch và kiểm số dòng, rồi contract sau một release. Duy trì bản restore staging và kiểm thử WAL/PITR trước production. Đổi engine ghi `grading_version` hoặc `algorithm_version` và giữ lịch sử trước đây.
+5. Sprint 05 tạo saved_vocabulary trước, drain các giao dịch completion đang xử lý, chốt phạm vi completion đã commit và dựng kho từ theo (completed_at,run_id) trong từng batch. Với mỗi candidate, giữ mục đầu tiên còn khả dụng theo thứ tự này, dùng ngày completion làm saved_at và `ON CONFLICT DO NOTHING`. Checkpoint đi cùng transaction của batch. Chạy trước khi mở auto-save và enroll cho learner; endpoint complete trả 503 kèm Retry-After trong cửa sổ cutover đã đo, giữ nguyên run để phục hồi. Bật insert realtime và gỡ gate sau đối soát. Backfill chỉ tác động kho từ, giữ receipt, XP, progress, thẻ và lịch ôn.
 

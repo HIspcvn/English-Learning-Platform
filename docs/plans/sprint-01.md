@@ -27,7 +27,7 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 ### S01-01 — Tạo danh tính và vòng đời token
 
 - **Mục tiêu** Cấp danh tính có email xác minh độc lập.
-- **Tệp và module** apps/api/app/identity, apps/api/app/worker, apps/api/alembic/versions, apps/api/tests/identity
+- **Tệp và module** `apps/api/app/identity/`, `apps/api/app/worker/`, `apps/api/alembic/versions/`, `apps/api/tests/identity/`
 - **Đầu vào** Email chuẩn hoá, sau đó là token proof, display_name và password hợp lệ.
 - **Đầu ra** User pending không có credential, rồi active với mật khẩu băm sau khi xác minh email. Token được gửi qua transactional outbox.
 - **Phụ thuộc** S00-03
@@ -44,7 +44,7 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 ### S01-02 — Phiên và quyền truy cập
 
 - **Mục tiêu** Đưa cùng-origin session vào web/API.
-- **Tệp và module** apps/api/app/identity, apps/web/app/(auth), apps/api/tests/identity
+- **Tệp và module** `apps/api/app/identity/`, `apps/web/app/(auth)/`, `apps/web/features/auth/`, `apps/api/tests/identity/`
 - **Đầu vào** User xác minh, phiên opaque, CSRF.
 - **Đầu ra** Session mới sau login, guard, logout, thu hồi khi reset.
 - **Phụ thuộc** S01-01
@@ -61,7 +61,7 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 ### S01-03 — Onboarding và settings an toàn
 
 - **Mục tiêu** Lưu mục tiêu và thiết lập lần đầu.
-- **Tệp và module** apps/web/app/(learn), apps/api/app/identity, apps/web/tests/e2e
+- **Tệp và module** `apps/web/app/(learn)/onboarding/`, `apps/web/features/auth/`, `apps/api/app/identity/`, `apps/web/tests/e2e/`
 - **Đầu vào** Tài khoản có phiên, CEFR tự chọn, mục tiêu kỳ thi tùy chọn, locale và IANA timezone.
 - **Đầu ra** Hồ sơ tối thiểu và phân nhánh tiếp tục onboarding.
 - **Phụ thuộc** S01-02
@@ -78,7 +78,7 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 ### S01-04 — Yêu cầu xuất và xóa dữ liệu
 
 - **Mục tiêu** Cho chủ tài khoản thực thi quyền dữ liệu qua quy trình có audit.
-- **Tệp và module** apps/api/app/identity, apps/api/app/worker, apps/api/alembic/versions, apps/web/features/settings và apps/api/tests/identity.
+- **Tệp và module** `apps/api/app/identity/`, `apps/api/app/worker/`, `apps/api/alembic/versions/`, `apps/web/app/(learn)/settings/`, `apps/web/features/settings/`, `apps/api/tests/identity/`
 - **Đầu vào** Phiên learner, mật khẩu hiện tại, yêu cầu export hoặc erase đã xác nhận.
 - **Đầu ra** Cấp step-up 10 phút, receipt job, trạng thái chủ tài khoản và link tải ngắn hạn sau export.
 - **Phụ thuộc** S01-01, S01-02 và S01-03.

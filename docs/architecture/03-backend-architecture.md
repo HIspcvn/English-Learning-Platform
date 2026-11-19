@@ -1,29 +1,30 @@
 # Kiến trúc backend
 
-**PROPOSED.** Một FastAPI service xử lý HTTP, một worker tùy giai đoạn dùng chung codebase và PostgreSQL. Giữ transaction boundary ở application use case và ràng buộc lâu dài ở database.
+Một FastAPI service xử lý HTTP. Khi phase cần xử lý bất đồng bộ, worker dùng chung codebase và PostgreSQL 17. Application use case sở hữu transaction, database giữ ràng buộc lâu dài. Mô tả các module nghiệp vụ bên dưới là đặc tả theo phase. [ADR công cụ](adr/0001-local-toolchain-and-monorepo.md)
 
 ## Biên module
 
 | Module | Sở hữu | Interface dùng bởi |
 | --- | --- | --- |
 | `identity` | Users, opaque session, email/reset, RBAC, profile, preferences, owner-scoped privacy requests | Middleware xác thực và lấy timezone, CMS role guard. |
-| `curriculum` | Course → Unit → Lesson, prereq/recommendation, đọc published snapshot | Dashboard, run factory, catalog, content. |
-| `editorial` | Soạn version, review, import, publish, audit | Write-side curriculum; media readiness check. |
-| `learning` | Run, prompt cursor, hints, attempts, completion | Dùng pure graders và đồng bộ progress. |
-| `engines` | Pure typing/grammar/sample reference/rubric, không DB/provider | Learning use case; AI rubric dùng envelope chung. |
-| `progress` | Progress per lesson, daily goal/activity, study sessions; reward sau V2 | /me/progress, mutate trong completion/review transaction. |
-| `vocabulary` | Lexical entries/senses, decks, personal saved entries | Dictionary read và review selector theo entry. |
-| `review` | Card, SM-2 state, due query, review history | Vocabulary enroll, progress/streak accrual. |
-| `media` | Asset object và cue metadata validation/access | Editorial, curriculum, pronunciation, videos. |
+| `curriculum` | Course → Unit → Lesson, prerequisite và snapshot bài đã xuất bản | Dashboard, run factory, catalog. |
+| `cms` | Import, review, publish, audit và liên kết target vào snapshot | Write-side curriculum, media readiness và provenance. |
+| `learning` | Run, prompt cursor, hints, attempts, completion | Dùng grader thuần, phối hợp progress và từ đã lưu trong transaction. |
+| `exercises` | Grader thuần cho typing, grammar và reference/rubric | Learning use case, AI rubric dùng envelope chung. |
+| `progress` | Progress theo lesson, daily goal/activity, study sessions và ledger XP MVP | /me/progress, cập nhật cùng completion/review. |
+| `vocabulary` | Identity mục từ và nghĩa từ S02. Deck, kho cá nhân, tombstone và auto-save từ S05 | CMS ghim nghĩa; dictionary đọc và SRS chọn nghĩa khi learner yêu cầu. |
+| `srs` | Card theo nghĩa/chiều, SM-2 state, due và review history | Ghi danh tường minh, cập nhật progress khi review đã commit. |
+| `grammar`, `dictionary`, `reading`, `translation` | Nội dung và DTO riêng cho các kỹ năng V1 | Curriculum snapshot, learning và vocabulary. |
+| `media`, `video`, `pronunciation` | Asset validation/access, transcript cues và audio/phát âm versioned | CMS, curriculum, typing và trang kỹ năng. |
 | `ai` | Consented feedback request, model adapter, budget, recorded result | Translation/shadowing V2, processing worker. |
-| `engagement` | Optional social, achievements, help queue | Progress reward event, settings/privacy. |
+| `support`, `gamification`, `social` | Góp ý cá nhân, streak/leaderboard/thành tích V2 và tương tác xã hội tùy chọn | Progress ledger, settings và privacy. |
 
 ```mermaid
 flowchart LR
   HTTP["FastAPI routers"]
   Identity["Identity/RBAC"]
   Curriculum["Curriculum"]
-  Editorial["Editorial/CMS"]
+  Editorial["CMS"]
   Learning["Learning runs"]
   Engines["Exercise engines"]
   Progress["Progress"]
@@ -40,9 +41,11 @@ flowchart LR
   Learning --> Engines
   Learning --> Curriculum
   Learning --> Progress
+  Learning --> Vocab
   Review --> Vocab
   Review --> Progress
   Editorial --> Curriculum
+  Editorial --> Vocab
   Editorial --> Media
   AI --> Media
   Identity --> PG
@@ -52,7 +55,7 @@ flowchart LR
   Progress --> PG
 ```
 
-Module Python có `router.py`, `schemas.py`, `service.py` và model/repository khi cần. `database` giữ session factory, migrations. Cổng media/email/AI có implementation cụ thể và stub cho test; domain nội bộ gọi typing/alignment trực tiếp. Cấm gọi HTTP vòng qua các module trong monolith. Read model có thể join module qua view/query đã thống nhất, write do module sở hữu.
+Entry point là `app.main:app` trong `apps/api`; các module nằm trực tiếp dưới `apps/api/app/`. Thêm `router.py`, `schemas.py`, `service.py` hoặc model theo nhu cầu thực. `app.database` giữ engine/session, `apps/api/alembic/versions/` giữ revision với một head và `apps/api/tests/` giữ kiểm thử. Sprint 00 baseline chỉ tạo metadata Alembic. Dùng Python 3.13, uv 0.12.7, `apps/api/uv.lock`, SQLAlchemy 2 sync và DSN psycopg 3. Domain nội bộ gọi module trực tiếp. Read model có thể join qua query thống nhất, write do module sở hữu.
 
 ## HTTP và quyền
 
@@ -68,15 +71,15 @@ Module Python có `router.py`, `schemas.py`, `service.py` và model/repository k
 
 ## Giao dịch, xung đột và sự kiện
 
-- Tạo run đảm bảo một `active` trên tuple user/lesson/version/mode, kiểm active qua unique partial index. `GET run` trả current item và revision; status `active/completed/abandoned`. App retry giữ cùng khóa.
+- Run có tối đa một `active` trên tuple user/lesson/version/mode/difficulty, với `NULLS NOT DISTINCT` cho difficulty nullable ở loại bài khác. `GET run` trả current item và revision. Resume theo run ID giữ snapshot; replay cần intent riêng và không đóng run active.
 - Với command có idempotency, scope là `user_id + operation_id + Idempotency-Key`; body hash từ method, resource IDs và canonical JSON, bao gồm expected revision. Chèn reservation trước mutation trong cùng transaction. Unique conflict chờ transaction trước, sau commit đọc receipt. Cùng hash replay response đã lưu, khác hash trả `409 IDEMPOTENCY_CONFLICT`. Transient 5xx rollback reservation, retry cho phép. TTL receipt ít nhất 7 ngày, durable constraints bảo vệ completion và reviews sau TTL. Không dùng body response cache cho credential hoặc signed URL.
-- `SELECT FOR UPDATE` lock run/card rows, sau đó kiểm revision/stale item. Chính sách lock completion: idempotency → run → progress lesson row → daily row → reward/outbox. Nếu Giao dịch bulk CMS chạm nhiều lesson, đặt thứ tự theo ID. Deadlock/serialization retry hữu hạn với jitter, giữ idempotency.
-- Attempt và review log append-only. Khi đúng hoặc chấp nhận reveal theo mode, mutation trả item result và cursor; hint có counter riêng và bị giới hạn bởi policy. Completion yêu cầu items terminal, unique theo run, cập nhật best/last và bảng ngày trong cùng commit. V2 nhận XP cho lần hoàn thành đầu của lesson đủ điều kiện; key là user + loại nguồn + lesson ID. Review nhận thưởng theo policy sự kiện riêng nếu rollout bật. Reward unique theo source; projection bổ sung đẩy qua outbox trong cùng commit và consumer có dedupe.
-- Run version luôn được pin. Mark “superseded” ở mức catalog pointer; run cũ đọc version cũ đã publish. Nếu nội dung bị gỡ quyền, áp dụng flags access revoke hoặc media block trong read path riêng và audit, không rewrite lịch sử.
+- Khóa run/card bằng `SELECT FOR UPDATE` rồi kiểm revision và item hiện tại. Thứ tự completion là idempotency → run → lesson progress → daily row → XP → saved meaning theo UUID → receipt và outbox nếu cần. Hai FK nguồn từ XP/kho từ đến receipt được hoãn đến commit. Bulk CMS khóa lesson theo ID. Retry deadlock hữu hạn cùng idempotency key.
+- Attempt và review log append-only. Nudge giữ cursor và đánh dấu assisted, reveal đủ điều kiện đưa item graded vào terminal, lần nộp lưu cờ assisted tại thời điểm nộp. Sau khi đủ required terminal, một receipt immutable cập nhật lịch sử và daily distinct lesson. Sprint 03 cấp +10 XP cho lần completion graded không trợ giúp đầu tiên mỗi learner/lesson; Sprint 04 đọc XP riêng tư. Từ Sprint 05, transaction chèn nghĩa được biên soạn cho các mục bắt buộc của run graded, giữ marker và tombstone đã có. Thẻ SRS được tạo bởi lệnh enroll riêng. V2 xây streak, leaderboard và thành tích từ nguồn sự kiện đã commit. [Engine](06-exercise-engines.md)
+- Current pointer chỉ ảnh hưởng run mới. Run cũ tiếp tục với snapshot đã ghim khi còn quyền. Khi version bị thu hồi, active run đọc/ghi trả 410, lịch sử chỉ trả kết quả tổng hợp được phép và thay đổi quyền được audit.
 - Worker lấy job PostgreSQL qua FOR UPDATE SKIP LOCKED, set lease và attempt rồi nhả txn trước IO. Heartbeat chỉ khi job dài; dead lease có thể nhận lại. Finalize theo job id và lease owner; insert result/outbox với dedupe key. Retry exponential jitter giới hạn, trạng thái dead/needs manual review sau max attempts. API trả 202 cùng status URL.
 - Privacy/export/delete theo lifecycle đã công bố. Bất biến lịch sử dành cho hoạt động bình thường; quy trình xóa có thẩm quyền xử lý riêng, quyền DB giới hạn và audit.
 
 ## Chuẩn vận hành tối thiểu
 
-`GET /health/live` kiểm process, `GET /health/ready` kiểm DB/schema compatibility, không gọi external provider trong readiness. API dependencies được inject theo request. Metrics về rate/error/duration, conflicts, query wait, lease age, outbox lag, completions, retries và queue backlog. Bộ lỗi transient có retry hints cụ thể. Integration tests dùng PostgreSQL thật để kiểm unique lock/idempotency và migrate/revert schema phù hợp. Chi tiết [database](04-database-design.md), [API](05-api-specification.md) và [triển khai](07-deployment-architecture.md).
+`GET /health/live` kiểm tiến trình. `GET /health/ready` truy vấn DB thật và kiểm revision Alembic đúng head, trả 503 theo Problem Details khi chưa sẵn sàng. JSON logs lưu request ID, method, status và duration. OpenAPI 3.1 phục vụ tại `/api/v1/openapi.json`. Integration tests dùng PostgreSQL thật; kiểm unique lock/idempotency theo sprint nghiệp vụ. [ADR HTTP](adr/0002-http-and-deployment-baseline.md) · [API](05-api-specification.md) · [Triển khai](07-deployment-architecture.md)
 

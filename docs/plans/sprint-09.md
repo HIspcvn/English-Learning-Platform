@@ -4,23 +4,23 @@
 
 ## Mục tiêu và phạm vi
 
-Cho người học nghe mẫu, đọc IPA và tự so sánh bản ghi trong phiên.
+Cho người học nghe mẫu, đọc IPA và tự so sánh bản ghi trong phiên. Mở tổ hợp Nghe & nói Nâng cao của Gõ câu ở V1.
 
-- **Phạm vi** Phoneme set, example audio, record/playback, video cue shadowing; chấm phát âm sau.
-- **Tiền điều kiện và phụ thuộc** [Sprint 06](sprint-06.md), [Sprint 08](sprint-08.md)
-- **Tính năng** FR-IPA-001, FR-SHADOW-001.
+- **Phạm vi** IPA, phát mẫu, ghi/phát cục bộ, shadowing theo cue và Gõ câu `listen_speak/advanced` với `practice_ack`. Chấm tự động là lựa chọn V2.
+- **Tiền điều kiện và phụ thuộc** [Sprint 03](sprint-03.md) cho run và lane Gõ câu, [Sprint 06](sprint-06.md) cho từ điển, [Sprint 08](sprint-08.md) cho player và cue.
+- **Tính năng** FR-IPA-001, FR-SHADOW-001, FR-TYPE-001 (Nghe & nói).
 - **Đặc tả giao diện** [SRS](../requirements/02-SRS.md), [API](../architecture/05-api-specification.md), [ERD](../architecture/04-database-design.md).
 
 ## Công việc theo lớp
 
 | Lớp | Công việc |
 |---|---|
-| PostgreSQL | Pronunciation examples mapped to assets; local recordings mặc định. |
-| Backend | Read IPA corpus, client media capability hints, record progress khi hoàn tất hoạt động. |
+| PostgreSQL | IPA và audio tham chiếu theo asset; run Nghe & nói dùng snapshot cùng lane model S03. |
+| Backend | Đọc IPA, mở lane Nghe & nói ở Nâng cao, chấp nhận self-ack theo item/revision và completion unscored. |
 | Frontend | IPA chart, phoneme detail, permission denied và reference/speech playback. |
 | Nội dung | IPA UK/US có editorial review và recording cùng license. |
-| Kiểm thử | Permission deny/allow, duration bound, browser unsupported, cleanup memory. |
-| Bảo mật | Xin phép mic khi user bấm, dừng streams khi rời màn, local-only mặc định. |
+| Kiểm thử | Permission deny/allow, thời lượng, thiết bị, cleanup, quyền run và QA-TYPE-17. |
+| Bảo mật | Xin phép mic khi người học bấm, dừng stream khi rời màn. Bản ghi ở lại thiết bị. |
 
 ## Task có thể review độc lập
 
@@ -41,17 +41,17 @@ Cho người học nghe mẫu, đọc IPA và tự so sánh bản ghi trong phi�
 - [ ] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
 - [ ] Gửi thay đổi và bằng chứng chạy kiểm thử để review.
 
-### S09-02 — Ghi âm so sánh shadowing
+### S09-02 — Ghi âm cục bộ cho shadowing và Nghe & nói
 
-- **Mục tiêu** Đi hết vòng record/replay bằng browser.
-- **Tệp và module** apps/web/features/shadowing, apps/web/tests/e2e, apps/api/app/progress
-- **Đầu vào** Active cue, supported MediaRecorder, local consent.
-- **Đầu ra** Record state, secured local audio/revoke, completion event.
-- **Phụ thuộc** S09-01, S08-02
+- **Mục tiêu** Nghe mẫu và so sánh bản ghi trên browser hỗ trợ, giữ luồng tự luyện khi mic bị từ chối.
+- **Tệp và module** `apps/web/features/shadowing/`, `apps/web/features/typing/`, `apps/web/app/(learn)/learn/[runId]/`, `apps/web/tests/e2e/`, `apps/api/app/learning/`
+- **Đầu vào** Cue hoặc item Gõ câu, audio tham chiếu đã duyệt, capability MediaRecorder và consent cục bộ.
+- **Đầu ra** Ghi/phát/revoke cục bộ và self-ack từng item Nghe & nói. Completion hiển thị tiến độ thực hành, điểm/mastery null và XP 0.
+- **Phụ thuộc** S03-02, S09-01, S08-02
 - **Ưu tiên và ước lượng** P1 · 4–5 ngày developer.
-- **Hướng dẫn triển khai** Giới hạn thời lượng, một stream, cleanup object URL; điều hướng hoặc stop đóng tracks.
-- **Ca kiểm thử** Denied, no device, permission later, pause source, max duration.
-- **Nghiệm thu** Nghe mẫu và bản ghi trên browser được hỗ trợ, có fallback nếu thiết bị từ chối.
+- **Hướng dẫn triển khai** Giới hạn thời lượng, một stream, cleanup object URL. Dừng tracks khi stop/rời trang. Lane Nghe & nói chỉ có Nâng cao, API nhận lệnh `practice_ack` có item/revision/key. Learner có thể nghe và tự xác nhận khi thiếu mic.
+- **Ca kiểm thử** QA-TYPE-17. Kiểm deny/no-device, xin lại quyền, dừng nguồn, chạm giới hạn thời lượng, nộp lại key và tiến độ vẫn giữ khi reload.
+- **Nghiệm thu** Cả hai luồng phát audio đã duyệt và có fallback mic. Nghe & nói hoàn tất bằng self-ack, không upload bản ghi, không cấp XP hoặc lưu từ tự động.
 - **Commit đề xuất** `feat: add privacy-first shadowing recorder`.
 
 - [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
@@ -60,7 +60,7 @@ Cho người học nghe mẫu, đọc IPA và tự so sánh bản ghi trong phi�
 
 ## Điều kiện hoàn tất
 
-- **Nghiệm thu sprint** Nghe mẫu và phát bản ghi cục bộ; mic bị từ chối vẫn dùng nội dung đọc.
+- **Nghiệm thu sprint** Người học replay mẫu/bản ghi cục bộ và hoàn tất Nghe & nói Nâng cao nhờ tự xác nhận. Khi từ chối mic, audio mẫu và self-ack vẫn hoạt động. [Ca kiểm thử theo feature](../testing/02-test-cases.md)
 - **Bàn giao** Các task trên đã được review, bản trình diễn staging và bằng chứng kiểm thử đính kèm. Migration có hướng nâng cấp và hướng khôi phục khi sprint thay đổi schema.
 - **Rủi ro dự kiến** Khả năng codec/MediaRecorder khác nhau và thu âm ngoài ý muốn.
 

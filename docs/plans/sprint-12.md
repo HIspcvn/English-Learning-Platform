@@ -27,13 +27,13 @@
 ### S12-01 — Release gates theo phiên bản
 
 - **Mục tiêu** Cố định tiêu chí promotion và bằng chứng.
-- **Tệp và module** .github/workflows, apps/api/tests, apps/web/tests
+- **Tệp và module** `.github/workflows/`, `apps/api/tests/`, `apps/web/tests/e2e/`
 - **Đầu vào** Release scope, NFR, QA cases, representative content.
 - **Đầu ra** Test matrix có threshold và kết quả trên artifacts.
 - **Phụ thuộc** S04-03 và S05-03 cho MVP. V1 thêm S07-03 và S09-02. V2 thêm S10-03 và S11-02.
 - **Ưu tiên và ước lượng** P0 · 3–5 ngày developer.
 - **Hướng dẫn triển khai** Chạy contract/migration/product journeys, verify license, accessible keyboard and performance budgets.
-- **Ca kiểm thử** Simulate regressions, duplicate commands, 390px, WebKit media, AI feature toggle.
+- **Ca kiểm thử** MVP kiểm duplicate completion và XP, cutover kho từ, tombstone và ghi danh SRS. V1 thêm 390px, WebKit media và QA-TYPE-17 khi từ chối mic. V2 thêm AI feature toggle và các gate opt-in.
 - **Nghiệm thu** Green cho nhóm phiên bản hiện hành và blocker có owner.
 - **Commit đề xuất** `test: enforce versioned release gates`.
 
@@ -44,12 +44,12 @@
 ### S12-02 — Production và rollback
 
 - **Mục tiêu** Triển khai stack với chứng cứ phục hồi thật.
-- **Tệp và module** infra, .github/workflows, runbooks, apps/api/app/health
+- **Tệp và module** `.github/workflows/`, `docs/runbooks/`, `apps/api/app/main.py`, cấu hình hạ tầng đã được phê duyệt
 - **Đầu vào** Staging snapshot vô danh, approved immutable images và migrations.
 - **Đầu ra** Production deploy plan, telemetry, rollback runbook and restore drill receipt.
 - **Phụ thuộc** S12-01
 - **Ưu tiên và ước lượng** P0 · 4–6 ngày developer.
-- **Hướng dẫn triển khai** Expand/contract schema, image tags immutable, point-in-time restore, rollout smoke và theo dõi worker/job failures.
+- **Hướng dẫn triển khai** Dựng deployment sau khi duyệt hosting, dùng expand/contract schema và image digest immutable. Kiểm Alembic head, health, point-in-time restore, rollout smoke và lỗi worker/job theo phase.
 - **Ca kiểm thử** Migration rollback decision, expired secrets, restore measure, killed app restart.
 - **Nghiệm thu** Chạy smoke trước/sau rollback, ghi RPO/RTO đạt đã chốt.
 - **Commit đề xuất** `ops: verify deployment rollback and data restore`.

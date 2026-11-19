@@ -6,9 +6,9 @@
 
 Hiển thị tiến độ đáng tin và giúp người học quay lại bài đang làm.
 
-- **Phạm vi** Continue, dashboard, mục tiêu, thời gian học có giới hạn và lịch sử gần đây.
+- **Phạm vi** Continue, dashboard, mục tiêu, thời gian học có giới hạn, lịch sử gần đây và tổng XP cá nhân từ ledger Sprint 03.
 - **Tiền điều kiện và phụ thuộc** [Sprint 03](sprint-03.md)
-- **Tính năng** FR-PROG-001, FR-CUR-001, FR-SET-001.
+- **Tính năng** FR-PROG-001, FR-CUR-001, FR-SET-001 và phần đọc XP của FR-GAME-001.
 - **Đặc tả giao diện** [SRS](../requirements/02-SRS.md), [API](../architecture/05-api-specification.md), [ERD](../architecture/04-database-design.md).
 
 ## Công việc theo lớp
@@ -29,12 +29,12 @@ Hiển thị tiến độ đáng tin và giúp người học quay lại bài đ
 - **Mục tiêu** Trả trạng thái mà dashboard và catalog dùng chung.
 - **Tệp và module** apps/api/app/progress, apps/api/tests/progress, apps/api/alembic/versions
 - **Đầu vào** Completion receipt và eligible run.
-- **Đầu ra** Aggregate per learner/lesson và /me/progress.
+- **Đầu ra** Aggregate per learner/lesson/variant và /me/progress gồm tổng XP cá nhân.
 - **Phụ thuộc** S03-02
 - **Ưu tiên và ước lượng** P0 · 3–4 ngày developer.
-- **Hướng dẫn triển khai** Approval completion transaction ghi summary cùng source event. Tách activity gần đây theo cursor.
-- **Ca kiểm thử** Hai completion đồng thời, attempt chưa hoàn thành, version mới, cross-user.
-- **Nghiệm thu** Đọc lại phản ánh đúng completion; retry không thêm bản ghi.
+- **Hướng dẫn triển khai** Dùng dữ liệu completion và ledger đã phát sinh ở S3. Gộp mục tiêu ngày theo day/lesson distinct. Hoạt động gần đây dùng cursor và giữ từng run đã hoàn tất. CTA dùng run ID có quyền và giữ lane/version đang học. Tổng XP chỉ đọc, không tái cấp từ event.
+- **Ca kiểm thử** Hai completion đồng thời, replay cùng bài và ngày, attempt chưa hoàn thành, version mới, cross-user.
+- **Nghiệm thu** Cùng lesson trong một ngày có tối đa một điểm đếm ngày, vẫn thấy từng run thật trong lịch sử. Tổng XP khớp ledger.
 - **Commit đề xuất** `feat: project atomic learning progress`.
 
 - [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
