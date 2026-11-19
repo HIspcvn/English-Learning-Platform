@@ -3,8 +3,13 @@ from alembic.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import Engine, create_engine, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import DeclarativeBase
 
 from app.config import API_ROOT, Settings
+
+
+class Base(DeclarativeBase):
+    pass
 
 
 def create_runtime_engine(settings: Settings) -> Engine:

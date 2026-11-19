@@ -45,6 +45,10 @@ jobs:
 
       - name: Start disposable PostgreSQL
         run: |
+          key=$(python -c 'import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())')
+          echo "::add-mask::$key"
+          echo "AUTH_MAIL_KEY=$key" >> "$GITHUB_ENV"
+          export AUTH_MAIL_KEY="$key"
           docker compose --env-file .env.example config --quiet
           docker compose --env-file .env.example up --detach --wait db
           docker compose --env-file .env.example exec -T db createdb -U elp elp_test

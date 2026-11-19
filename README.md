@@ -6,7 +6,7 @@
 
 English Learning Platform is an independent web application being built for people in Vietnam who want to improve their English through regular, guided practice. The planned study flow will help learners choose their next lesson, act on feedback, and revisit material when it is due for review.
 
-The repository currently contains a runnable development foundation. The web home page checks its connection to the API, and the local stack provides database migrations, health checks, and automated tests. Learner accounts, lessons, and progress tracking are planned.
+The repository contains a runnable development foundation and an API for creating and verifying email identities. The local stack provides database migrations, health checks, automated tests, and a Mailpit inbox for verification email.
 
 ## Product Vision
 
@@ -56,7 +56,7 @@ apps/
   api/                 FastAPI application, Alembic migrations, and API tests
 docs/                  Product requirements, architecture, roadmap, and test plans
 .github/workflows/     GitHub Actions workflow
-compose.yaml           Local PostgreSQL, migration, API, and web services
+compose.yaml           Local PostgreSQL, migration, API, mail worker, Mailpit, and web
 .env.example           Local Compose configuration template
 ```
 
@@ -66,6 +66,8 @@ Install Docker Engine with Docker Compose v2 or later. For host-side development
 
 ```powershell
 if (!(Test-Path .env)) { Copy-Item .env.example .env }
+# Generate a local key for this shell. Keep the same key across restarts while mail is queued.
+$env:AUTH_MAIL_KEY = python -c "import base64, secrets; print(base64.urlsafe_b64encode(secrets.token_bytes(32)).decode())"
 docker compose config --quiet
 docker compose up --build --detach --wait
 Invoke-RestMethod http://127.0.0.1:3000/health/live
@@ -73,6 +75,8 @@ Invoke-RestMethod http://127.0.0.1:3000/health/ready
 ```
 
 With the default ports, open the local web app at `http://127.0.0.1:3000/`. The OpenAPI document is at `http://127.0.0.1:3000/api/v1/openapi.json`. Run `docker compose down` to stop the stack and retain the database volume.
+
+Open Mailpit at `http://127.0.0.1:8025/`. To test email verification without the future verification screen, get `GET /api/v1/auth/session` through the web origin and keep its cookie. Include that origin and the returned `csrf_token` in the `Origin` and `X-CSRF-Token` headers on auth POSTs. Register a synthetic address, then take the token from the Mailpit link fragment and send it as JSON with `password` and `display_name` to `/api/v1/auth/verify`. A `204` confirms activation. See the [S01-01 plan](docs/plans/tasks/S01-01-email-identity.md).
 
 ## Environment Configuration
 
@@ -84,6 +88,10 @@ Use [`.env.example`](.env.example) as the template for your local `.env`. Keep d
 | `POSTGRES_PORT`, `API_PORT`, `WEB_PORT` | Set loopback host ports. Defaults are `15432`, `8000`, and `3000`, respectively. |
 | `DATABASE_URL` | SQLAlchemy connection URL with the `postgresql+psycopg://` scheme. Compose sets it for the API and migration services. Set it in the API terminal when running directly on the host. |
 | `TEST_DATABASE_URL` | Connection URL for a disposable PostgreSQL database used by integration tests. |
+| `AUTH_PUBLIC_ORIGIN` | Exact browser origin for guest auth and mail links. Compose derives it from `WEB_PORT` by default. HTTP is available for loopback development. |
+| `AUTH_MAIL_KEY`, `AUTH_MAIL_KEY_ID` | Base64-encoded 32-byte local mail key and its identifier. Store in the local environment or ignored `.env`. Drain queued verification mail before rotating the local key. |
+| `SMTP_HOST`, `SMTP_PORT`, `SMTP_SENDER` | Worker delivery configuration. Compose uses the internal Mailpit service. Host development defaults to `127.0.0.1:1025` and a reserved sender address. |
+| `MAILPIT_WEB_PORT`, `MAILPIT_SMTP_PORT` | Local Mailpit ports. Defaults are `8025` and `1025`. |
 | `API_INTERNAL_URL` | API origin used by Next.js rewrites. Set it before starting the dev server or building the web app if the host API runs outside the default origin `http://127.0.0.1:8000`. Use an origin without credentials or a path. |
 | `PLAYWRIGHT_BASE_URL` | Web origin for tests against a running stack. Set it explicitly when testing Compose. |
 
@@ -92,8 +100,8 @@ Use [`.env.example`](.env.example) as the template for your local `.env`. Keep d
 For host-side development, stop the Compose web and API services to free their ports, leave PostgreSQL running, and install the frontend dependencies.
 
 ```powershell
-docker compose stop web api
-docker compose up --detach --wait db
+docker compose stop web api mail-worker
+docker compose up --detach --wait db mailpit
 npm.cmd ci
 ```
 
@@ -106,10 +114,10 @@ $env:DATABASE_URL = "$dbOrigin/$($db.POSTGRES_DB)"
 Set-Location apps/api
 uv sync --locked
 uv run --locked alembic upgrade head
-uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log
+uv run --locked uvicorn app.main:app --host 127.0.0.1 --port 8000 --no-access-log --no-proxy-headers
 ```
 
-In a separate terminal at the repository root, run `npm.cmd run dev`.
+Run `uv run --locked python -m app.worker` from `apps/api` in a separate terminal with the same database URL and mail key. At the repository root, run `npm.cmd run dev` in a third terminal.
 
 ## Testing & Quality Assurance
 
@@ -157,7 +165,7 @@ Recorded local verification covers 10 backend tests, 4 web unit tests, and 4 Pla
 | V1 | Additional language skills, bilingual content, and media-based practice | Planned |
 | V2 | Opt-in AI feedback and expanded personalization | Planned |
 
-Email authentication and onboarding are the next scheduled work. [Full roadmap](docs/plans/00-master-roadmap.md)
+Follow the [implementation tracker](docs/plans/implementation-status.md) for task status and evidence. [Full roadmap](docs/plans/00-master-roadmap.md)
 
 ## Documentation
 
@@ -168,4 +176,4 @@ Email authentication and onboarding are the next scheduled work. [Full roadmap](
 
 ## Current Project Status
 
-The current implementation supports a responsive home page with a live API connectivity check and retry, database-aware readiness, a baseline migration, and generated API types. This is a development preview. The first learner-facing milestone is the MVP described above.
+The current implementation supports a responsive home page with API connectivity and retry, database-aware readiness, schema migrations, generated API types, and the guest email verification workflow. Login, learner sessions, and the verification screen are scheduled in Sprint 01.
