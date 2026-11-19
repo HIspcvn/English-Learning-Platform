@@ -1,6 +1,6 @@
 # Sprint 00 — Chốt yêu cầu và dựng môi trường
 
-> PROPOSED · Nền tảng MVP · Các đường dẫn code bên dưới là vị trí dự kiến.
+> Nền tảng MVP · Các quyết định local đã chốt trong ADR. Xem [bằng chứng thực thi](../testing/04-sprint-00-verification.md) để biết cổng nào đã chạy.
 
 ## Mục tiêu và phạm vi
 
@@ -9,7 +9,7 @@ Tạo baseline để developer clone và chạy một quy trình kiểm tra lặ
 - **Phạm vi** Chốt ADR, cấu trúc monorepo, môi trường và CI tối thiểu.
 - **Tiền điều kiện và phụ thuộc** Workspace có quyền ghi và bộ blueprint đã được đọc.
 - **Tính năng** FR-LAND-001, FR-AUTH-001, FR-CUR-001, FR-TYPE-001.
-- **Đặc tả giao diện** [SRS](../requirements/02-SRS.md), [API](../architecture/05-api-specification.md), [ERD](../architecture/04-database-design.md).
+- **Đặc tả giao diện** [SRS](../requirements/02-SRS.md), [API](../architecture/05-api-specification.md), [ERD](../architecture/04-database-design.md), [parity](../requirements/06-feature-parity-matrix.md).
 
 ## Công việc theo lớp
 
@@ -32,14 +32,14 @@ Tạo baseline để developer clone và chạy một quy trình kiểm tra lặ
 - **Đầu ra** ADR theo chủ đề, người ký, ngưỡng và tiêu chí đảo quyết định.
 - **Phụ thuộc** Blueprint
 - **Ưu tiên và ước lượng** P0 · 1–2 ngày developer.
-- **Hướng dẫn triển khai** Chốt session, CSRF, miền ứng dụng, vị trí dữ liệu và ranh giới MVP. Gán hạn cho vấn đề còn mở.
+- **Hướng dẫn triển khai** Chốt session, CSRF, nền local và ranh giới MVP. Gán người phụ trách và hạn cho các quyết định hosting, vùng dữ liệu, email và chi phí production. [ADR toolchain](../architecture/adr/0001-local-toolchain-and-monorepo.md) · [ADR HTTP](../architecture/adr/0002-http-and-deployment-baseline.md) · [ADR Gõ câu](../architecture/adr/0003-learning-variants-rewards-vocabulary.md)
 - **Ca kiểm thử** Review trace FR→DB/API→QA và kiểm tra các ID duy nhất.
 - **Nghiệm thu** Sprint 1 có thể cho ra contract tests ngay.
 - **Commit đề xuất** `docs: approve initial platform decisions`.
 
-- [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
-- [ ] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
-- [ ] Gửi thay đổi và bằng chứng chạy kiểm thử để review.
+- [x] Đối chiếu 49 nhóm nghiên cứu, yêu cầu, API, ERD và QA.
+- [x] Chốt ADR local và giữ danh sách Open Decision production.
+- [x] Rà soát hợp đồng và liên kết với kế hoạch các sprint.
 
 ### S00-02 — Khởi tạo môi trường chạy
 
@@ -49,14 +49,14 @@ Tạo baseline để developer clone và chạy một quy trình kiểm tra lặ
 - **Đầu ra** Next/FastAPI/PostgreSQL chạy bằng Compose và health endpoint.
 - **Phụ thuộc** S00-01
 - **Ưu tiên và ước lượng** P0 · 2–3 ngày developer.
-- **Hướng dẫn triển khai** Khoá dependency trực tiếp và chuyển tiếp, chuẩn hoá cấu hình dev/test/prod, readiness kiểm tra DB.
+- **Hướng dẫn triển khai** Khoá dependency bằng npm và uv. Compose chờ DB rồi chạy revision nền trước khi mở API. Check readiness đối chiếu revision Alembic thực tế. Next gọi API qua cùng origin.
 - **Ca kiểm thử** Compose mới báo healthy, DB ngắt thì readiness báo lỗi và liveness còn hoạt động.
 - **Nghiệm thu** Checkout sạch phục hồi đầy đủ từ README mới của Sprint 0.
 - **Commit đề xuất** `chore: bootstrap modular platform`.
 
-- [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
-- [ ] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
-- [ ] Gửi thay đổi và bằng chứng chạy kiểm thử để review.
+- [x] Chạy ca red cho API, trang chủ và liveness parser trước triển khai.
+- [x] Build và chạy Compose từ clone sạch, đối chiếu migration, liveness và readiness khi dừng DB.
+- [x] Ghi quy trình chạy và bằng chứng đã thực thi.
 
 ### S00-03 — Dựng CI và test harness
 
@@ -68,17 +68,18 @@ Tạo baseline để developer clone và chạy một quy trình kiểm tra lặ
 - **Ưu tiên và ước lượng** P0 · 2–3 ngày developer.
 - **Hướng dẫn triển khai** Tách DB mỗi job, migration thật, dùng role ít quyền và fixtures độc lập thời gian.
 - **Ca kiểm thử** Bẻ health hoặc schema khiến pipeline đỏ, khôi phục thì xanh.
-- **Nghiệm thu** Một PR có kết quả bắt buộc cho web, API, migration và smoke.
+- **Nghiệm thu** Chạy lint, format, typecheck, migration và smoke từ checkout sạch. Workflow cung cấp cùng các kiểm tra trên GitHub. Để xác nhận ở cấp PR, cần có repository remote và lần chạy GitHub Actions thực tế.
 - **Commit đề xuất** `ci: enforce reproducible quality checks`.
 
-- [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
-- [ ] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
-- [ ] Gửi thay đổi và bằng chứng chạy kiểm thử để review.
+- [x] Chạy đủ lint, format, typecheck, unit, integration và browser smoke.
+- [x] Kiểm schema sinh lại, Actionlint và quét Git bằng Gitleaks.
+- [ ] Xác nhận cổng hosted ở lần chạy GitHub Actions đầu tiên.
 
 ## Điều kiện hoàn tất
 
-- **Nghiệm thu sprint** CI chạy lint, typecheck, tests và smoke trên checkout sạch. ADR chốt auth, hosting, tenancy và DB được review.
-- **Bàn giao** Các task trên đã được review, bản trình diễn staging và bằng chứng kiểm thử đính kèm. Migration có hướng nâng cấp và hướng khôi phục khi sprint thay đổi schema.
+- **Nghiệm thu local** ADR chốt toolchain, hợp đồng auth, tenancy và DB. Lint, typecheck, tests, migration và smoke vận hành trên checkout sạch. README và bằng chứng kiểm thử nằm trong repository.
+- **Nghiệm thu hosted** Chạy workflow trên GitHub trước khi dựa vào trạng thái PR. Môi trường staging/production theo quyết định hosting trước pilot.
+- **Bàn giao** Review và đối chiếu bằng chứng với từng task. Migration có hướng upgrade và downgrade được thử trên PostgreSQL cô lập.
 - **Rủi ro dự kiến** Lệch phiên bản runtime và lockfile giữa CI với máy developer.
 
 [Lộ trình và điều kiện phát hành](00-master-roadmap.md) · [Ma trận kiểm thử](../testing/02-test-cases.md)
