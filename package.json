@@ -1,0 +1,22 @@
+{
+  "name": "english-learning-platform",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": ["apps/web"],
+  "engines": {
+    "node": ">=24 <25",
+    "npm": ">=11 <12"
+  },
+  "scripts": {
+    "dev": "npm run dev --workspace @elp/web",
+    "build": "npm run build --workspace @elp/web",
+    "lint": "npm run lint --workspace @elp/web",
+    "typecheck": "npm run typecheck --workspace @elp/web",
+    "test:web": "npm run test:unit --workspace @elp/web",
+    "test:e2e": "npm run test:e2e --workspace @elp/web --",
+    "api:types": "openapi-typescript apps/api/openapi.json -o apps/web/lib/api/schema.d.ts"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}
