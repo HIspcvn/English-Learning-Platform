@@ -34,10 +34,11 @@
 | Git diff và secret scan | **PASS** `git diff --check` từ baseline S01-01 và Gitleaks 8.30.0 quét lịch sử Git, không phát hiện secret. |
 | CI hosted Sprint 00 | **PASS** Workflow Sprint 00 trên `main` tại `ec9be05`. [Run 44495463264](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44495463264) |
 | CI hosted S01-01 | **PASS** PR tại `a92a9f2` và `main` sau merge tại `6e6d1c4`. [Run PR](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44507218765) · [Run main](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44508335891) |
-| CI hosted S01-02 | **SKIP** Thay đổi ở nhánh local. Chờ review và kết quả GitHub Actions của chính SHA được gửi review. |
+| CI hosted S01-02 | **PASS** Job `verify` thành công cho commit `6abd9a4` trong PR #2 ngày 20/11/2026. [Run 44657096433](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44657096433) |
+| Rate limit sau ingress · 20/11/2026 | **PASS** Smoke API và PostgreSQL trên mạng Docker riêng. Image mặc định và peer ngoài allowlist vẫn nhận `429` ở lượt reset thứ 11 dù thay `X-Forwarded-For`. Qua peer trong allowlist, một IP client nhận `429` còn IP client thứ hai vẫn nhận `410` cho proof thử nghiệm. Còn phải kiểm tra việc ingress ghi đè header và cách ly cổng API trên staging. [Gate staging](../architecture/adr/0002-http-and-deployment-baseline.md#trust-boundary-cho-rate-limiting) |
 
 Để tái chạy Playwright, dùng stack Compose mới với volume rỗng, đặt `PLAYWRIGHT_BASE_URL` và `PLAYWRIGHT_MAILPIT_URL` theo cổng kiểm thử rồi chạy `npm.cmd run test:e2e`. Ca trust boundary chủ động dùng hết quota reset của IP proxy. [Lệnh chạy](../../README.md#testing--quality-assurance)
 
 ## Điều kiện chuyển S01-03
 
-S01-03 dùng guard server-side, `UserView.onboarding_completed` và CSRF hiện tại để lưu preferences và hoàn tất onboarding. Đối chiếu lại hành trình xác minh → đăng nhập → onboarding sau khi đã có form và API preferences thật. Gửi các commit local để review và chạy CI hosted trước khi xác nhận nghiệm thu remote của S01-02. [Checklist Sprint 01](../plans/sprint-01.md#s01-02--phiên-và-quyền-truy-cập)
+S01-03 dùng guard server-side, `UserView.onboarding_completed` và CSRF hiện tại để lưu preferences và hoàn tất onboarding. Đối chiếu lại hành trình xác minh → đăng nhập → onboarding sau khi đã có form và API preferences thật. [Checklist Sprint 01](../plans/sprint-01.md#s01-02--phiên-và-quyền-truy-cập)

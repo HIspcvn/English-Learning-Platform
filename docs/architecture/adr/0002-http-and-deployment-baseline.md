@@ -12,9 +12,11 @@
 
 ## Trust boundary cho rate limiting
 
-Local, CI và Compose chạy Uvicorn với `--no-proxy-headers`. API lấy IP từ kết nối trực tiếp. Qua rewrite Next.js, các request dùng chung quota IP của tiến trình Next. Các endpoint theo email còn có quota theo email chuẩn hóa. Next có thể chuyển tiếp `X-Forwarded-For` do client cung cấp, nên API local bỏ qua toàn bộ forwarded headers.
+Native dev chạy Uvicorn với `--no-proxy-headers`. Image API dùng `--proxy-headers` với `FORWARDED_ALLOW_IPS` mặc định rỗng, kể cả trong Compose local và CI. API lấy IP từ kết nối trực tiếp trong các môi trường này. Qua rewrite Next.js, các request dùng chung quota IP của tiến trình Next và các endpoint theo email vẫn có quota riêng theo email chuẩn hóa.
 
-Khi triển khai production, ingress TLS cùng origin định tuyến `/api/v1/` trực tiếp tới FastAPI. Chỉ ingress được kết nối vào cổng API. Tại ingress, loại forwarded headers từ Internet và đặt `X-Forwarded-For` bằng IP của kết nối đã xác thực ở biên. Khi bật `--proxy-headers`, cấu hình Uvicorn `--forwarded-allow-ips` với đúng địa chỉ ingress được phép. Với dịch vụ cân bằng tải phía trước, chỉ dùng địa chỉ client do tầng tin cậy cung cấp sau khi chặn đường vào trực tiếp. Kiểm thử hai địa chỉ thật dùng hai bucket, header tự khai giữ nguyên bucket, và client Internet không được kết nối trực tiếp vào API trước khi bật ở staging.
+Khi triển khai staging hoặc production, ingress TLS cùng origin định tuyến `/api/v1/` trực tiếp tới FastAPI. Giữ API trong mạng private và giới hạn các dịch vụ có thể kết nối vào cổng API. Next dùng origin nội bộ cho các request server-side và nằm ngoài danh sách proxy tin cậy. Tại ingress, ghi đè `X-Forwarded-For` bằng IP client đã xác minh tại biên và `X-Forwarded-Proto` bằng giao thức client tại biên. Với load balancer hoặc CDN phía trước, chỉ lấy IP client từ hop đã xác thực và chặn đường truy cập bỏ qua hop đó.
+
+Đặt `FORWARDED_ALLOW_IPS` trên container API bằng đúng IP nguồn của ingress khi ingress kết nối tới API. Có thể liệt kê nhiều địa chỉ phân cách bằng dấu phẩy, ví dụ `10.20.0.12,10.20.0.13` nếu đó là hai peer ingress được cấp. Tránh `*` và dải mạng có dịch vụ khác. Trước khi mở website công khai, xác minh ở staging hai IP client đi qua ingress dùng hai bucket riêng, forwarded header do client khai bị ghi đè, và cổng API không truy cập trực tiếp được từ Internet.
 
 ## Open Decision
 
