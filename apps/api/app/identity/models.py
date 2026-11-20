@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
@@ -19,6 +19,9 @@ from app.database import Base
 
 VERIFICATION_PURPOSE = "verify_email"
 VERIFICATION_JOB = "auth.verify_email"
+RESET_PURPOSE = "reset_password"
+RESET_JOB = "auth.reset_password"
+AUTH_MAIL_JOB_BY_PURPOSE = {VERIFICATION_PURPOSE: VERIFICATION_JOB, RESET_PURPOSE: RESET_JOB}
 
 
 class User(Base):
@@ -49,6 +52,60 @@ class UserProfile(Base):
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     display_name: Mapped[str] = mapped_column(String(80))
+
+
+class LearningPreferences(Base):
+    __tablename__ = "learning_preferences"
+    __table_args__ = (
+        CheckConstraint("locale IN ('vi', 'en')", name="ck_learning_preferences_locale"),
+        CheckConstraint(
+            "current_cefr IN ('A1', 'A2', 'B1', 'B2', 'C1', 'C2')",
+            name="ck_learning_preferences_current_cefr",
+        ),
+        CheckConstraint(
+            "default_accent IN ('uk', 'us', 'system')",
+            name="ck_learning_preferences_default_accent",
+        ),
+        CheckConstraint("revision > 0", name="ck_learning_preferences_revision"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    locale: Mapped[str] = mapped_column(String(2), server_default="vi")
+    timezone: Mapped[str] = mapped_column(Text)
+    current_cefr: Mapped[str] = mapped_column(String(2))
+    target_kind: Mapped[str | None] = mapped_column(Text)
+    target_code: Mapped[str | None] = mapped_column(Text)
+    exam_date: Mapped[date | None]
+    default_accent: Mapped[str] = mapped_column(Text, server_default="system")
+    ai_opt_in: Mapped[bool] = mapped_column(server_default=text("false"))
+    social_opt_in: Mapped[bool] = mapped_column(server_default=text("false"))
+    onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revision: Mapped[int] = mapped_column(server_default=text("1"))
+
+
+class AuthSession(Base):
+    __tablename__ = "auth_sessions"
+    __table_args__ = (
+        UniqueConstraint("token_digest", name="uq_auth_sessions_token_digest"),
+        CheckConstraint("octet_length(token_digest) = 32", name="ck_auth_sessions_digest_length"),
+        CheckConstraint(
+            "octet_length(csrf_secret) = 32", name="ck_auth_sessions_csrf_secret_length"
+        ),
+        Index("ix_auth_sessions_user_id_revoked_at", "user_id", "revoked_at"),
+        Index("ix_auth_sessions_expires_at", "expires_at"),
+        Index("ix_auth_sessions_last_seen_at", "last_seen_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"))
+    token_digest: Mapped[bytes] = mapped_column(LargeBinary)
+    csrf_secret: Mapped[bytes] = mapped_column(LargeBinary)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    last_seen_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    reauthenticated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuthToken(Base):

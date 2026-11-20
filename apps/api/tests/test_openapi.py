@@ -48,3 +48,44 @@ def test_auth_schema_exposes_actual_mutation_headers_and_problem_responses():
     verify = paths["/api/v1/auth/verify"]["post"]["responses"]
     assert "content" not in verify["204"]
     assert "application/problem+json" in verify["410"]["content"]
+
+
+def test_openapi_auth_session_and_recovery_contract():
+    from app.main import app
+
+    schema = app.openapi()
+    base = "/api/v1/auth"
+    paths = schema["paths"]
+    session = paths[f"{base}/session"]["get"]["responses"]["200"]["content"]["application/json"][
+        "schema"
+    ]
+    assert {branch["$ref"] for branch in session["anyOf"]} == {
+        "#/components/schemas/AuthenticatedSession",
+        "#/components/schemas/GuestSession",
+    }
+    operations = (
+        ("login", "200", {"401", "403", "422", "429", "503"}),
+        ("logout", "204", {"403", "503"}),
+        ("password/forgot", "202", {"403", "422", "429", "503"}),
+        ("password/reset", "204", {"403", "410", "422", "429", "503"}),
+    )
+    for endpoint, success, failures in operations:
+        operation = paths[f"{base}/{endpoint}"]["post"]
+        assert {
+            (parameter["name"], parameter["in"], parameter["required"])
+            for parameter in operation["parameters"]
+        } == {("Origin", "header", True), ("X-CSRF-Token", "header", endpoint != "logout")}
+        assert success in operation["responses"]
+        if success == "204":
+            assert "content" not in operation["responses"][success]
+        if endpoint in {"login", "logout"}:
+            assert "Set-Cookie" in operation["responses"][success]["headers"]
+        for code in failures:
+            response = operation["responses"][code]
+            assert set(response["content"]["application/problem+json"]["schema"]["required"]) >= {
+                "status",
+                "code",
+                "request_id",
+            }
+            if code in {"429", "503"}:
+                assert "Retry-After" in response["headers"]

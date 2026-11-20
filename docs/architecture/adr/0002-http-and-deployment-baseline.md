@@ -10,6 +10,14 @@
 - `DATABASE_URL` là DSN SQLAlchemy `postgresql+psycopg://` cho API/Alembic. `TEST_DATABASE_URL` chỉ trỏ vào PostgreSQL dùng một lần cho test có migration. Root `.env.example` là mẫu Compose với dữ liệu dev. Các giá trị thật đi qua env/secret store, không đưa về browser hoặc commit. Port mở trên loopback local.
 - Hợp đồng Sprint 01 dùng cookie `__Host-elp_session` opaque, Secure, HttpOnly, SameSite=Lax. Mutation kiểm Origin và CSRF. Guest dùng double-submit, learner dùng header HMAC gắn phiên. OpenAPI thể hiện request/response trước khi tạo client. Các chuẩn này triển khai theo [hợp đồng auth](../05-api-specification.md).
 
+## Trust boundary cho rate limiting
+
+Native dev chạy Uvicorn với `--no-proxy-headers`. Image API dùng `--proxy-headers` với `FORWARDED_ALLOW_IPS` mặc định rỗng, kể cả trong Compose local và CI. API lấy IP từ kết nối trực tiếp trong các môi trường này. Qua rewrite Next.js, các request dùng chung quota IP của tiến trình Next và các endpoint theo email vẫn có quota riêng theo email chuẩn hóa.
+
+Khi triển khai staging hoặc production, ingress TLS cùng origin định tuyến `/api/v1/` trực tiếp tới FastAPI. Giữ API trong mạng private và giới hạn các dịch vụ có thể kết nối vào cổng API. Next dùng origin nội bộ cho các request server-side và nằm ngoài danh sách proxy tin cậy. Tại ingress, ghi đè `X-Forwarded-For` bằng IP client đã xác minh tại biên và `X-Forwarded-Proto` bằng giao thức client tại biên. Với load balancer hoặc CDN phía trước, chỉ lấy IP client từ hop đã xác thực và chặn đường truy cập bỏ qua hop đó.
+
+Đặt `FORWARDED_ALLOW_IPS` trên container API bằng đúng IP nguồn của ingress khi ingress kết nối tới API. Có thể liệt kê nhiều địa chỉ phân cách bằng dấu phẩy, ví dụ `10.20.0.12,10.20.0.13` nếu đó là hai peer ingress được cấp. Tránh `*` và dải mạng có dịch vụ khác. Trước khi mở website công khai, xác minh ở staging hai IP client đi qua ingress dùng hai bucket riêng, forwarded header do client khai bị ghi đè, và cổng API không truy cập trực tiếp được từ Internet.
+
 ## Open Decision
 
 | Quyết định | Chủ trì | Hạn và tiêu chí chốt |

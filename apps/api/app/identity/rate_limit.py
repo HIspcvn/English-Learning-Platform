@@ -37,7 +37,9 @@ def charge(session: Session, scope: str, value: str, limit: int, now: datetime) 
     return max(1, ceil((expires_at - now).total_seconds()))
 
 
-def retry_after(engine: Engine, peer: str, email: str | None = None) -> int | None:
+def retry_after(
+    engine: Engine, peer: str, email: str | None = None, *, scope: str | None = None
+) -> int | None:
     now = datetime.now(UTC)
     expired_keys = (
         select(AuthRateLimit.key)
@@ -50,9 +52,9 @@ def retry_after(engine: Engine, peer: str, email: str | None = None) -> int | No
     with engine.begin() as connection:
         connection.execute(delete(AuthRateLimit).where(AuthRateLimit.key.in_(expired_keys)))
     with Session(engine) as session, session.begin():
-        if email is None:
-            return charge(session, "verify:ip", peer, VERIFY_IP_LIMIT, now)
-        ip_retry = charge(session, "verification-mail:ip", peer, EMAIL_IP_LIMIT, now)
-        if ip_retry is not None:
+        scope = scope or ("verify" if email is None else "verification-mail")
+        ip_limit = VERIFY_IP_LIMIT if email is None else EMAIL_IP_LIMIT
+        ip_retry = charge(session, f"{scope}:ip", peer, ip_limit, now)
+        if ip_retry is not None or email is None:
             return ip_retry
-        return charge(session, "verification-mail:email", email.lower(), EMAIL_LIMIT, now)
+        return charge(session, f"{scope}:email", email.lower(), EMAIL_LIMIT, now)

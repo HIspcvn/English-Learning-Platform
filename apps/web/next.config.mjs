@@ -15,6 +15,12 @@ if (
 /** @type {import("next").NextConfig} */
 const nextConfig = {
   poweredByHeader: false,
+  async headers() {
+    return ["/verify", "/reset-password"].map((source) => ({
+      source,
+      headers: [{ key: "Referrer-Policy", value: "no-referrer" }],
+    }));
+  },
   async rewrites() {
     return [
       { source: "/api/v1/:path*", destination: `${apiUrl.origin}/api/v1/:path*` },
