@@ -37,7 +37,16 @@ def test_readiness_tracks_clean_upgrade_revision_mismatch_and_downgrade(clean_sc
             "user_profiles",
             "users",
         }
-        assert set(inspector.get_table_names()) == {"alembic_version", *product_tables}
+        assert set(inspector.get_table_names()) == {
+            "alembic_version",
+            "idempotency_records",
+            *product_tables,
+        }
+        assert inspector.get_pk_constraint("idempotency_records")["constrained_columns"] == [
+            "user_id",
+            "operation_id",
+            "idem_key",
+        ]
         for table in product_tables:
             primary_key = inspector.get_pk_constraint(table)["constrained_columns"]
             [column] = [
@@ -81,6 +90,52 @@ def test_migration_enforces_account_credentials(identity_engine, status, passwor
         session.flush()
 
     assert error.value.orig.diag.constraint_name == "ck_users_status_credentials"
+
+
+def test_learner_settings_migration_preserves_existing_preferences(clean_schema, migrations):
+    user = uuid4()
+    completed_at = datetime(2026, 11, 19, tzinfo=UTC)
+    command.upgrade(migrations, "0003_secure_sessions")
+    with clean_schema.begin() as connection:
+        connection.execute(
+            text("""
+                INSERT INTO users (id, email, email_norm, status, password_hash, verified_at)
+                VALUES (:id, 'learner@example.com', 'learner@example.com', 'active', 'test', :ts)
+            """),
+            {"id": user, "ts": completed_at},
+        )
+        connection.execute(
+            text("INSERT INTO user_profiles (user_id, display_name) VALUES (:id, 'Học viên')"),
+            {"id": user},
+        )
+        connection.execute(
+            text("""
+                INSERT INTO learning_preferences
+                    (user_id, locale, timezone, current_cefr, onboarding_completed_at, revision)
+                VALUES (:id, 'en', 'Asia/Ho_Chi_Minh', 'B1', :ts, 4)
+            """),
+            {"id": user, "ts": completed_at},
+        )
+
+    command.upgrade(migrations, "head")
+    command.check(migrations)
+    with clean_schema.connect() as connection:
+        assert connection.execute(text("SELECT display_name, bio FROM user_profiles")).one() == (
+            "Học viên",
+            None,
+        )
+
+    command.downgrade(migrations, "0003_secure_sessions")
+    assert "idempotency_records" not in inspect(clean_schema).get_table_names()
+    command.upgrade(migrations, "head")
+    command.check(migrations)
+    with clean_schema.connect() as connection:
+        assert connection.execute(
+            text("""
+                SELECT locale, timezone, current_cefr, onboarding_completed_at, revision
+                FROM learning_preferences
+            """)
+        ).one() == ("en", "Asia/Ho_Chi_Minh", "B1", completed_at, 4)
 
 
 def test_migration_enforces_one_open_proof_per_user_and_purpose(identity_engine):

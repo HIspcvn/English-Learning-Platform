@@ -89,3 +89,31 @@ def test_openapi_auth_session_and_recovery_contract():
             }
             if code in {"429", "503"}:
                 assert "Retry-After" in response["headers"]
+
+
+def test_openapi_learner_account_contract_requires_session_and_mutation_headers():
+    from app.main import app
+
+    paths = app.openapi()["paths"]
+    operations = (
+        ("profile", "get", set(), {"401", "503"}),
+        ("profile", "patch", {"Origin", "X-CSRF-Token"}, {"401", "403", "404", "422", "503"}),
+        ("preferences", "get", set(), {"401", "503"}),
+        (
+            "preferences",
+            "put",
+            {"Origin", "X-CSRF-Token", "Idempotency-Key"},
+            {"401", "403", "409", "422", "503"},
+        ),
+    )
+    for resource, method, headers, failures in operations:
+        operation = paths[f"/api/v1/me/{resource}"][method]
+        assert {
+            parameter["name"]
+            for parameter in operation.get("parameters", [])
+            if parameter["in"] == "header" and parameter["required"]
+        } == headers
+        responses = operation["responses"]
+        assert "application/json" in responses["200"]["content"]
+        for code in failures:
+            assert "application/problem+json" in responses[code]["content"]
