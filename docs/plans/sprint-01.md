@@ -1,6 +1,6 @@
 # Sprint 01 — Xác thực và onboarding
 
-> MVP · S01-01 và S01-02 đã đạt CI hosted. [Tiến độ thực thi](implementation-status.md)
+> MVP · S01-01 và S01-02 đã đạt CI hosted. S01-03 đạt nghiệm thu local. [Tiến độ thực thi](implementation-status.md)
 
 ## Mục tiêu và phạm vi
 
@@ -57,7 +57,7 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 - [x] Viết ca kiểm thử và xác nhận lỗi đặc trưng trước khi có endpoint và trước bản sửa timing.
 - [x] Hoàn thành đầu ra, chạy PostgreSQL riêng, Playwright qua Compose và đối chiếu nghiệm thu.
 - [x] Bàn giao commit local và bằng chứng chạy kiểm thử để review. [Kế hoạch](tasks/S01-02-secure-sessions.md) · [Bằng chứng](../testing/06-sprint-01-secure-sessions-verification.md)
-- [x] CI hosted đạt trên `6abd9a4` trong PR #2. [GitHub Actions](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44657096433)
+- [x] PR #2 đã merge. CI hosted đạt trên `8a4b05f` và `9a026ae` trên `main`. [CI PR](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44659079262) · [CI main](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44659950108)
 
 ### S01-03 — Onboarding và settings an toàn
 
@@ -68,13 +68,13 @@ Người học tạo và khôi phục tài khoản, onboarding vào dashboard v�
 - **Phụ thuộc** S01-02
 - **Ưu tiên và ước lượng** P0 · 2–3 ngày developer.
 - **Hướng dẫn triển khai** Tách dữ liệu public/private, validate IANA, dùng locale vi/en mặc định vi. PUT /me/preferences hoàn tất onboarding khi đủ trường. Mục tiêu phút/ngày dùng endpoint Progress từ Sprint 04.
-- **Ca kiểm thử** Refresh giữa onboarding, timezone lỗi, PATCH user khác trả lỗi, tab order.
+- **Ca kiểm thử** Refresh giữa onboarding, timezone lỗi, cách ly tài khoản, xung đột revision, thao tác bàn phím.
 - **Nghiệm thu** Đăng ký đến onboarding đến dashboard thành công trên desktop/mobile.
 - **Commit đề xuất** `feat: add learner onboarding and settings`.
 
-- [ ] Viết ca kiểm thử nêu trên và kiểm tra lỗi đặc trưng trước thay đổi.
-- [ ] Hoàn thành đầu ra, chạy ca kiểm thử liên quan và đối chiếu nghiệm thu.
-- [ ] Gửi thay đổi và bằng chứng chạy kiểm thử để review.
+- [x] Xác nhận ca đỏ của hợp đồng API và guard settings trên baseline trước thay đổi.
+- [x] Hoàn thành đầu ra, chạy 118 pytest, 13 unit web và 11 Playwright trên stack riêng.
+- [x] Bàn giao nhánh riêng và bằng chứng kiểm thử cho PR vào `main`. [Kế hoạch](tasks/S01-03-onboarding-settings.md) · [Bằng chứng](../testing/07-sprint-01-onboarding-settings-verification.md)
 
 ### S01-04 — Yêu cầu xuất và xóa dữ liệu
 
