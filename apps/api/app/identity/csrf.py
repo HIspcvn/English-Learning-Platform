@@ -7,6 +7,15 @@ from uuid import UUID
 from fastapi import Request, Response
 
 
+def mutation_headers(*, csrf_required: bool = True) -> dict:
+    return {
+        "parameters": [
+            {"name": name, "in": "header", "required": required, "schema": {"type": "string"}}
+            for name, required in (("Origin", True), ("X-CSRF-Token", csrf_required))
+        ]
+    }
+
+
 def valid_guest_value(value: str) -> bool:
     return fullmatch(r"[A-Za-z0-9_-]{43}", value) is not None
 

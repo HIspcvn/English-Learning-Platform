@@ -5,6 +5,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import Settings
 from app.database import create_runtime_engine
+from app.identity.learner import retire_expired_receipts
 from app.identity.sessions import retire_expired_sessions
 from app.worker.mail import deliver_one
 
@@ -18,13 +19,14 @@ def main() -> None:
         raise SystemExit("AUTH_MAIL_KEY is required by the identity mail worker")
 
     engine = create_runtime_engine(settings)
-    next_session_cleanup = monotonic()
+    next_cleanup = monotonic()
     try:
         while True:
             try:
-                if monotonic() >= next_session_cleanup:
+                if monotonic() >= next_cleanup:
                     retire_expired_sessions(engine)
-                    next_session_cleanup = monotonic() + 60
+                    retire_expired_receipts(engine)
+                    next_cleanup = monotonic() + 60
                 if not deliver_one(engine, settings):
                     sleep(1)
             except OperationalError:

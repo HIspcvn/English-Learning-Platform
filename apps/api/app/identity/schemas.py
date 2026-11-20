@@ -2,7 +2,15 @@ from typing import Annotated, Literal
 from uuid import UUID
 
 from email_validator import EmailNotValidError, validate_email
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, SecretStr, field_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    BeforeValidator,
+    ConfigDict,
+    Field,
+    SecretStr,
+    field_validator,
+)
 
 
 def validate_utf8(value: str | SecretStr) -> str | SecretStr:
@@ -17,6 +25,25 @@ def validate_utf8(value: str | SecretStr) -> str | SecretStr:
 Password = Annotated[SecretStr, Field(min_length=12, max_length=128), AfterValidator(validate_utf8)]
 ProofToken = Annotated[
     SecretStr, Field(min_length=1, max_length=128), AfterValidator(validate_utf8)
+]
+
+
+def validate_plain_text(value: str) -> str:
+    if "\x00" in value:
+        raise ValueError("Invalid text")
+    validate_utf8(value)
+    return value
+
+
+def trim_display_name(value: object) -> object:
+    return value.strip() if isinstance(value, str) else value
+
+
+DisplayName = Annotated[
+    str,
+    Field(min_length=1, max_length=80),
+    BeforeValidator(trim_display_name),
+    AfterValidator(validate_plain_text),
 ]
 
 
@@ -46,21 +73,7 @@ class PasswordResetRequest(BaseModel):
 
 
 class VerificationRequest(PasswordResetRequest):
-    display_name: str = Field(min_length=1, max_length=80)
-
-    @field_validator("display_name", mode="before")
-    @classmethod
-    def trim_display_name(cls, value: object) -> object:
-        if isinstance(value, str):
-            value = value.strip()
-            if "\x00" in value:
-                raise ValueError("Invalid display name")
-        return value
-
-    @field_validator("display_name")
-    @classmethod
-    def valid_display_name_utf8(cls, value: str) -> str | SecretStr:
-        return validate_utf8(value)
+    display_name: DisplayName
 
 
 class LoginRequest(EmailRequest):

@@ -4,6 +4,7 @@ from http import HTTPStatus
 from fastapi import Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from starlette.exceptions import HTTPException
 
 
 class Problem(BaseModel):
@@ -14,6 +15,19 @@ class Problem(BaseModel):
     instance: str
     code: str
     request_id: str
+
+
+class ProblemException(HTTPException):
+    def __init__(self, status: int, code: str, detail: str) -> None:
+        super().__init__(status_code=status, detail=detail)
+        self.code = code
+
+
+def documented_problem(description: str) -> dict:
+    return {
+        "description": description,
+        "content": {"application/problem+json": {"schema": Problem.model_json_schema()}},
+    }
 
 
 def problem_response(

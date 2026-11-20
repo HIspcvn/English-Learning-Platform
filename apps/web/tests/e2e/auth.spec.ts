@@ -1,64 +1,15 @@
 import { randomBytes, randomUUID } from "node:crypto";
 
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
+
+import { enterPassword, findProofLink, loopbackOrigin, mailpitUrl, openProof } from "./auth-fixtures";
 
 const auth = "/api/v1/auth";
-const mailpitUrl = process.env.PLAYWRIGHT_MAILPIT_URL;
 const password = "synthetic learner password";
 const newPassword = "synthetic replacement credential";
 
 // Browser and mail requests contain synthetic credentials and proof links.
 test.use({ trace: "off", screenshot: "off", video: "off" });
-
-function loopbackOrigin(value: string | undefined): string {
-  if (!value) throw new Error("Configure a disposable local auth stack to run this test");
-  const url = new URL(value);
-  if (!["127.0.0.1", "localhost", "[::1]"].includes(url.hostname)) {
-    throw new Error("Auth fixtures require a loopback URL");
-  }
-  return url.origin;
-}
-
-async function findProofLink(
-  request: APIRequestContext,
-  baseURL: string | undefined,
-  email: string,
-  path: "/verify" | "/reset-password",
-) {
-  const prefix = `${loopbackOrigin(baseURL)}${path}#token=`;
-  const mailbox = new URL("/api/v1/search", loopbackOrigin(mailpitUrl));
-  mailbox.searchParams.set("query", `to:${email}`);
-  let proofLink = "";
-
-  await expect.poll(async () => {
-    const result = await request.get(mailbox.href);
-    if (!result.ok()) return false;
-    const { messages } = await result.json() as { messages?: { ID: string }[] };
-    for (const { ID } of messages ?? []) {
-      const response = await request.get(new URL(`/api/v1/message/${ID}`, mailbox).href);
-      if (!response.ok()) continue;
-      const { Text } = await response.json() as { Text?: string };
-      proofLink = Text?.split(/\r?\n/).map((line) => line.trim()).find((line) => line.startsWith(prefix)) ?? "";
-      if (proofLink) return true;
-    }
-    return false;
-  }, { message: `Waiting for the worker to deliver mail for ${path}`, timeout: 20_000 }).toBe(true);
-  return proofLink;
-}
-
-async function openProof(page: Page, link: string) {
-  try {
-    await page.goto(link);
-  } catch {
-    throw new Error("Could not open the auth email link");
-  }
-  await expect.poll(() => Boolean(new URL(page.url()).hash)).toBe(false);
-}
-
-async function enterPassword(page: Page, value: string, confirm = false) {
-  await page.getByLabel("Mật khẩu", { exact: true }).fill(value);
-  if (confirm) await page.getByLabel("Nhập lại mật khẩu", { exact: true }).fill(value);
-}
 
 test("auth forms fit a 320px viewport and missing proof offers recovery", async ({ page }) => {
   await page.setViewportSize({ width: 320, height: 780 });

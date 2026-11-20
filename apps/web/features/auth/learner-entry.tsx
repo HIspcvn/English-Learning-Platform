@@ -1,36 +1,41 @@
+import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 
+import { LearnerApiError } from "@/lib/api/learner";
+
 import { loginDestination } from "./flow";
-import { LogoutForm } from "./logout-form";
-import { readServerUser } from "./server-session";
+import { readServerLearner, type LearnerSession } from "./server-session";
 import { AuthHeading, AuthShell, authLink } from "./shell";
 
-export async function LearnerEntry({ destination }: { destination: "/onboarding" | "/dashboard" }) {
-  const user = await readServerUser();
-  if (user === null) redirect("/login");
-  if (!user) {
-    return (
-      <AuthShell>
-        <AuthHeading title="Chưa thể tải phiên">
-          Không thể kiểm tra phiên đăng nhập. Vui lòng thử lại.
-        </AuthHeading>
-        <a className={authLink} href={destination}>Thử lại</a>
-      </AuthShell>
-    );
-  }
-  const expected = loginDestination(user.onboarding_completed);
-  if (destination !== expected) redirect(expected);
+type LearnerEntryProps = {
+  destination: "/onboarding" | "/dashboard" | "/settings";
+  children: (session: LearnerSession) => ReactNode | Promise<ReactNode>;
+};
 
-  const onboarding = destination === "/onboarding";
+function EntryUnavailable({ destination }: Pick<LearnerEntryProps, "destination">) {
   return (
     <AuthShell>
-      <AuthHeading title={onboarding ? "Thiết lập hồ sơ học tập" : "Tài khoản của bạn"}>
-        <span className="wrap-anywhere">Bạn đã đăng nhập với tên {user.display_name}.</span>
+      <AuthHeading title="Chưa thể tải tài khoản">
+        Vui lòng thử lại để kiểm tra phiên và tải thông tin của bạn.
       </AuthHeading>
-      <p className="mb-6 text-sm/6 text-muted-ink">
-        {onboarding ? "Phần thiết lập hồ sơ học tập sẽ mở ở bản cập nhật tiếp theo." : "Khu vực học tập chưa mở."}
-      </p>
-      <LogoutForm />
+      <a className={authLink} href={destination}>Thử lại</a>
     </AuthShell>
   );
+}
+
+export async function LearnerEntry({ destination, children }: LearnerEntryProps) {
+  const session = await readServerLearner();
+  if (session === null) redirect("/login");
+  if (!session) return <EntryUnavailable destination={destination} />;
+
+  const expected = loginDestination(session.user.onboarding_completed);
+  if ((destination === "/onboarding") !== (expected === "/onboarding")) redirect(expected);
+
+  try {
+    return await children(session);
+  } catch (error) {
+    if (!(error instanceof LearnerApiError)) throw error;
+    if (error.status === 401) redirect("/login");
+    return <EntryUnavailable destination={destination} />;
+  }
 }

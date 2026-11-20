@@ -5,17 +5,18 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Request, Response
 from starlette.concurrency import run_in_threadpool
 
-from app.errors import Problem, problem_response
+from app.errors import documented_problem, problem_response
 from app.identity.csrf import (
     guest_csrf_valid,
     issue_guest_csrf,
+    mutation_headers,
     origin_valid,
     session_csrf_token,
     session_csrf_valid,
-    valid_guest_value,
 )
 from app.identity.rate_limit import retry_after
 from app.identity.recovery import request_password_reset, reset_password
+from app.identity.request_session import load_request_session, secure_cookie, session_cookie_name
 from app.identity.schemas import (
     Accepted,
     AuthenticatedSession,
@@ -29,20 +30,12 @@ from app.identity.service import request_verification, verify_account
 from app.identity.sessions import (
     HARD_TTL,
     SessionIdentity,
-    load_session,
     login_account,
     logout_session,
 )
 
 router = APIRouter(prefix="/api/v1/auth", tags=["identity"])
 RECOVERY_RESPONSE_FLOOR_SECONDS = 0.25
-
-
-def documented_problem(description: str) -> dict:
-    return {
-        "description": description,
-        "content": {"application/problem+json": {"schema": Problem.model_json_schema()}},
-    }
 
 
 retry_header = {"Retry-After": {"schema": {"type": "integer"}, "description": "Seconds."}}
@@ -68,36 +61,12 @@ cookie_header = {
 private_headers = {"Cache-Control": "private, no-store"}
 
 
-def mutation_headers(*, csrf_required: bool = True) -> dict:
-    return {
-        "parameters": [
-            {"name": name, "in": "header", "required": required, "schema": {"type": "string"}}
-            for name, required in (("Origin", True), ("X-CSRF-Token", csrf_required))
-        ]
-    }
-
-
-def _secure_cookie(request: Request) -> bool:
-    return request.app.state.settings.auth_public_origin.startswith("https://")
-
-
-def _session_cookie_name(request: Request) -> str:
-    return "__Host-elp_session" if _secure_cookie(request) else "elp_session_local"
-
-
-def _session(request: Request, *, touch: bool = False) -> SessionIdentity | None:
-    token = request.cookies.get(_session_cookie_name(request), "")
-    if not valid_guest_value(token):
-        return None
-    return load_session(request.app.state.engine, token, touch=touch)
-
-
 def _mutation_session(
     request: Request, *, logout: bool = False
 ) -> tuple[SessionIdentity | None, bool]:
     if not origin_valid(request):
         return None, False
-    current = _session(request)
+    current = load_request_session(request)
     if current is None:
         return None, logout or guest_csrf_valid(request)
     return current, session_csrf_valid(request, current.id, current.csrf_secret)
@@ -119,7 +88,7 @@ def _authenticated_session(current: SessionIdentity) -> AuthenticatedSession:
 @router.get("/session", operation_id="getAuthSession", responses={503: unavailable_error})
 def get_auth_session(request: Request, response: Response) -> GuestSession | AuthenticatedSession:
     response.headers.update(private_headers)
-    current = _session(request, touch=True)
+    current = load_request_session(request, touch=True)
     if current is not None:
         return _authenticated_session(current)
     return GuestSession(user=None, csrf_token=issue_guest_csrf(request, response))
@@ -169,11 +138,11 @@ def login(
     token, current = result
     response.headers.update(private_headers)
     response.set_cookie(
-        _session_cookie_name(request),
+        session_cookie_name(request),
         token,
         max_age=int(HARD_TTL.total_seconds()),
         path="/",
-        secure=_secure_cookie(request),
+        secure=secure_cookie(request),
         httponly=True,
         samesite="lax",
     )
@@ -200,9 +169,9 @@ def logout(request: Request) -> Response:
         logout_session(request.app.state.engine, current.id)
     response = Response(status_code=204, headers=private_headers)
     response.delete_cookie(
-        _session_cookie_name(request),
+        session_cookie_name(request),
         path="/",
-        secure=_secure_cookie(request),
+        secure=secure_cookie(request),
         httponly=True,
         samesite="lax",
     )

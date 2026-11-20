@@ -1,8 +1,8 @@
 # Tiến độ triển khai English Learning Platform
 
-**Mốc đối chiếu 19/11/2026** · GitHub `main` tại `6e6d1c42123c` sau khi merge S01-01. S01-02 bắt đầu từ worktree sạch tại `a92a9f2b362b` trên `feat/sprint-01-auth-onboarding`. [PR #1](https://github.com/HIspcvn/English-Learning-Platform/pull/1)
+**Mốc đối chiếu 20/11/2026** · GitHub `main` tại `9a026ae` sau khi merge S01-02. S01-03 bắt đầu từ cùng commit trên nhánh riêng `codex/s01-03-onboarding-settings`. [PR #2](https://github.com/HIspcvn/English-Learning-Platform/pull/2) · [CI main](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44659950108)
 
-Ở mốc đối chiếu, ứng dụng có khung Next.js, FastAPI, PostgreSQL/Alembic và workflow CI của Sprint 00. Các đặc tả nghiệp vụ, API và ERD ở các sprint tính năng là đầu vào triển khai. Tiến độ nghiệm thu được ghi theo từng task bên dưới. [Lộ trình dự án](00-master-roadmap.md) · [Bằng chứng Sprint 00](../testing/04-sprint-00-verification.md)
+Các đặc tả nghiệp vụ, API và ERD ở các sprint tính năng là đầu vào triển khai. Tiến độ và bằng chứng được ghi theo từng task. [Lộ trình dự án](00-master-roadmap.md) · [Bằng chứng Sprint 00](../testing/04-sprint-00-verification.md)
 
 ## Quy ước cập nhật
 
@@ -19,8 +19,8 @@
 | [S00-02](sprint-00.md#s00-02--khởi-tạo-môi-trường-chạy) Khởi tạo môi trường chạy | S00-01 | DONE | `main`, `08eecc2`. Clone sạch, Compose healthy, PostgreSQL 17 upgrade/check/downgrade và readiness phục hồi sau khi khởi động lại DB. [Bằng chứng](../testing/04-sprint-00-verification.md) |
 | [S00-03](sprint-00.md#s00-03--dựng-ci-và-test-harness) Dựng CI và test harness | S00-02 | DONE | Workflow từ `9526ba2`. Local đạt 10 API, 4 unit web, 4 Playwright, OpenAPI, Actionlint và Gitleaks. Hosted PASS trên `main` tại `ec9be05`. [Bằng chứng local](../testing/04-sprint-00-verification.md) · [Run 44495463264](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44495463264) |
 | [S01-01](sprint-01.md#s01-01--tạo-danh-tính-và-vòng-đời-token) Danh tính email và xác minh | S00-03 | DONE | 50 pytest, 4 unit web, 4 Playwright, HTTP/Mailpit và Compose đạt local. Hosted PASS tại `a92a9f2` và sau merge trên `main` tại `6e6d1c4`. [Bằng chứng local](../testing/05-sprint-01-email-identity-verification.md) · [Run PR](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44507218765) · [Run main](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44508335891) |
-| [S01-02](sprint-01.md#s01-02--phiên-và-quyền-truy-cập) Phiên và quyền truy cập | S01-01 | DONE | Migration `e5998fe`, phiên `70f823c`, recovery `db3160f`, web `0520418`, điều chỉnh rà soát `a909784`, tests `4ec3cd7`. 85 pytest, 9 unit web, 8 Playwright và Compose đạt local. Hosted CI đạt tại `6abd9a4` trong PR #2. [Bằng chứng](../testing/06-sprint-01-secure-sessions-verification.md) · [Run 44657096433](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44657096433) |
-| [S01-03](sprint-01.md#s01-03--onboarding-và-settings-an-toàn) Onboarding và settings | S01-02 | NOT_STARTED | — |
+| [S01-02](sprint-01.md#s01-02--phiên-và-quyền-truy-cập) Phiên và quyền truy cập | S01-01 | DONE | 85 pytest, 9 unit web, 8 Playwright và Compose đạt local. Hosted CI đạt tại `8a4b05f` trong PR #2 và tại `9a026ae` sau merge vào `main`. [Bằng chứng](../testing/06-sprint-01-secure-sessions-verification.md) · [CI PR](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44659079262) · [CI main](https://github.com/HIspcvn/English-Learning-Platform/actions/runs/44659950108) |
+| [S01-03](sprint-01.md#s01-03--onboarding-và-settings-an-toàn) Onboarding và settings | S01-02 | DONE | API `4df9e36`, onboarding `434d016`, settings `9d18f23`, tests `657cc4b`. Đạt 118 pytest, 13 unit web, 11 Playwright, migration và Compose smoke. [Kế hoạch](tasks/S01-03-onboarding-settings.md) · [Bằng chứng](../testing/07-sprint-01-onboarding-settings-verification.md) |
 | [S01-04](sprint-01.md#s01-04--yêu-cầu-xuất-và-xóa-dữ-liệu) Xuất và xóa dữ liệu | S01-01, S01-02, S01-03 | NOT_STARTED | — |
 | [S02-01](sprint-02.md#s02-01--khung-khóa-và-route-catalog) Khung khóa và catalog | S01-03 | NOT_STARTED | — |
 | [S02-02](sprint-02.md#s02-02--import-draft-theo-manifest) Import draft | S02-01 | NOT_STARTED | — |
@@ -74,5 +74,5 @@ Chạy S12-01 và S12-02 cho từng release. Ghi kết quả và lệnh rollback
 ## Blocker và bước tiếp theo
 
 - **Staging và production** — Trước pilot cần chốt hosting, vùng dữ liệu, domain, ngân sách, backup/restore và điều kiện privacy. Trước gửi thư staging cần chốt nhà cung cấp email và sender DNS. [Các quyết định cần chốt](00-master-roadmap.md#các-quyết-định-cần-chốt) · [ADR HTTP và triển khai](../architecture/adr/0002-http-and-deployment-baseline.md)
-- **Hiện tại** — S01-02 đạt cổng local và hosted CI trên `6abd9a4`. PR #2 đang chờ review. [Bằng chứng](../testing/06-sprint-01-secure-sessions-verification.md) · [PR #2](https://github.com/HIspcvn/English-Learning-Platform/pull/2)
-- **Kế tiếp** — S01-03 dùng guard, CSRF và cờ `onboarding_completed` để triển khai onboarding và ghi preferences. Sau đó kiểm tra lại luồng từ xác minh email tới hoàn tất onboarding. [Kế hoạch S01-03](sprint-01.md#s01-03--onboarding-và-settings-an-toàn)
+- **Hiện tại** — S01-03 đạt kiểm thử local trên nhánh riêng. Bàn giao nhánh qua PR để review và đối chiếu CI theo commit đầu nhánh. [Bằng chứng](../testing/07-sprint-01-onboarding-settings-verification.md)
+- **Kế tiếp** — S01-04 triển khai yêu cầu xuất và xóa dữ liệu chủ tài khoản sau khi S01-03 được review. [Kế hoạch S01-04](sprint-01.md#s01-04--yêu-cầu-xuất-và-xóa-dữ-liệu)

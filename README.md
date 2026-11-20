@@ -6,7 +6,7 @@
 
 English Learning Platform is an independent web application being built for people in Vietnam who want to improve their English through regular, guided practice. The planned study flow will help learners choose their next lesson, act on feedback, and revisit material when it is due for review.
 
-The repository contains a runnable development foundation and an API for creating and verifying email identities. The local stack provides database migrations, health checks, automated tests, and a Mailpit inbox for verification email.
+The repository contains a runnable development foundation, email identity and sessions, learner onboarding, and account settings. The local stack provides database migrations, health checks, automated tests, and a Mailpit inbox for verification email.
 
 ## Product Vision
 
@@ -76,7 +76,7 @@ Invoke-RestMethod http://127.0.0.1:3000/health/ready
 
 With the default ports, open the local web app at `http://127.0.0.1:3000/`. The OpenAPI document is at `http://127.0.0.1:3000/api/v1/openapi.json`. Run `docker compose down` to stop the stack and retain the database volume.
 
-Open `/register` and enter a synthetic email address. In Mailpit at `http://127.0.0.1:8025/`, open the verification link, set a display name and password, then sign in. Use `/forgot-password` to test recovery through a second Mailpit message. The protected onboarding and dashboard destinations show session status until their planned features are implemented. [S01-02 plan](docs/plans/tasks/S01-02-secure-sessions.md)
+Open `/register` and enter a synthetic email address. In Mailpit at `http://127.0.0.1:8025/`, open the verification link, set a display name and password, then sign in. Save your preferences at `/onboarding` to open the account dashboard. Use `/settings` to update your profile or learning preferences, and `/forgot-password` to test recovery through a second Mailpit message. [S01-03 plan](docs/plans/tasks/S01-03-onboarding-settings.md)
 
 ## Environment Configuration
 
@@ -156,7 +156,7 @@ npm.cmd run api:types
 git diff --exit-code -- apps/api/openapi.json apps/web/lib/api/schema.d.ts
 ```
 
-Recorded local verification covers 10 backend tests, 4 web unit tests, and 4 Playwright smoke tests. The GitHub Actions workflow defines quality checks for pushes and pull requests. [Local verification record](docs/testing/04-sprint-00-verification.md) · [CI workflow](.github/workflows/ci.yml)
+The GitHub Actions workflow defines quality checks for pushes to `main` and pull requests. [S01-03 verification record](docs/testing/07-sprint-01-onboarding-settings-verification.md) · [CI workflow](.github/workflows/ci.yml)
 
 ## Development Roadmap
 
@@ -178,4 +178,4 @@ Follow the [implementation tracker](docs/plans/implementation-status.md) for tas
 
 ## Current Project Status
 
-The current implementation supports a responsive home page, database-aware readiness, generated API types, email registration and verification, cookie-based learner sessions, and password recovery. Learner onboarding and preferences are planned for S01-03.
+The current implementation supports a responsive home page, database-aware readiness, generated API types, email registration and verification, cookie-based learner sessions, password recovery, onboarding, and account settings. The dashboard shows account information and upcoming learning modules. [Implementation tracker](docs/plans/implementation-status.md)
