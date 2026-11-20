@@ -2,7 +2,11 @@ import type { ReactNode } from "react";
 
 export const authLink = "rounded-sm font-semibold text-brand underline underline-offset-4 hover:decoration-2 focus-visible:outline-3 focus-visible:outline-offset-2 focus-visible:outline-focus";
 
-export function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({ children, wide = false, headerAction }: {
+  children: ReactNode;
+  wide?: boolean;
+  headerAction?: ReactNode;
+}) {
   return (
     <div className="flex min-h-dvh flex-col bg-surface sm:bg-canvas">
       <a
@@ -12,7 +16,7 @@ export function AuthShell({ children }: { children: ReactNode }) {
         Bỏ qua đến nội dung chính
       </a>
       <header className="border-b border-line bg-surface">
-        <div className="mx-auto flex min-h-16 max-w-5xl items-center px-5 sm:px-10">
+        <div className="mx-auto flex min-h-16 max-w-5xl items-center justify-between gap-4 px-5 sm:px-10">
           {/* eslint-disable-next-line @next/next/no-html-link-for-pages -- Returning to a learner page must reach the server guard instead of Next's client cache. */}
           <a
             className="rounded-sm text-xl font-semibold tracking-tight text-brand focus-visible:outline-3 focus-visible:outline-offset-4 focus-visible:outline-focus"
@@ -21,14 +25,17 @@ export function AuthShell({ children }: { children: ReactNode }) {
           >
             Nhịp Anh
           </a>
+          {headerAction}
         </div>
       </header>
       <main
-        className="mx-auto w-full max-w-[30rem] flex-1 px-5 pt-10 pb-12 sm:px-0 sm:pt-[clamp(3rem,10vh,6rem)]"
+        className={wide
+          ? "mx-auto w-full max-w-5xl flex-1 px-5 py-8 sm:px-10 sm:py-12"
+          : "mx-auto w-full max-w-[30rem] flex-1 px-5 pt-10 pb-12 sm:px-0 sm:pt-[clamp(3rem,10vh,6rem)]"}
         id="main-content"
         tabIndex={-1}
       >
-        <div className="bg-surface sm:rounded-xl sm:border sm:border-line sm:p-10">{children}</div>
+        {wide ? children : <div className="bg-surface sm:rounded-xl sm:border sm:border-line sm:p-10">{children}</div>}
       </main>
     </div>
   );
