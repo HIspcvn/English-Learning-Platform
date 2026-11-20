@@ -93,6 +93,27 @@ def load_session(engine: Engine, token: str, *, touch: bool = False) -> SessionI
         )
 
 
+def lock_active_learner(session: Session, identity: SessionIdentity) -> bool:
+    # Follow password reset's user-first lock order before holding the session through a write.
+    user_id = session.scalar(
+        select(User.id).where(User.id == identity.user.id, *_active_user()).with_for_update()
+    )
+    if user_id is None:
+        return False
+    return (
+        session.scalar(
+            select(AuthSession.id)
+            .where(
+                AuthSession.id == identity.id,
+                AuthSession.user_id == user_id,
+                *_active_session(utc_now()),
+            )
+            .with_for_update()
+        )
+        is not None
+    )
+
+
 def _valid_credentials(password: str, encoded: str | None) -> bool:
     usable = encoded is not None and encoded.startswith("$argon2id$")
     try:

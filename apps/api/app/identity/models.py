@@ -52,6 +52,7 @@ class UserProfile(Base):
         ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
     )
     display_name: Mapped[str] = mapped_column(String(80))
+    bio: Mapped[str | None] = mapped_column(String(500))
 
 
 class LearningPreferences(Base):
@@ -83,6 +84,24 @@ class LearningPreferences(Base):
     social_opt_in: Mapped[bool] = mapped_column(server_default=text("false"))
     onboarding_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revision: Mapped[int] = mapped_column(server_default=text("1"))
+
+
+class IdempotencyRecord(Base):
+    __tablename__ = "idempotency_records"
+    __table_args__ = (
+        CheckConstraint("octet_length(body_hash) = 32", name="ck_idempotency_records_hash_length"),
+        Index("ix_idempotency_records_expires_at", "expires_at"),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), primary_key=True
+    )
+    operation_id: Mapped[str] = mapped_column(Text, primary_key=True)
+    idem_key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    body_hash: Mapped[bytes] = mapped_column(LargeBinary)
+    response_status: Mapped[int]
+    response_body: Mapped[dict[str, object]] = mapped_column(JSONB)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
 
 class AuthSession(Base):

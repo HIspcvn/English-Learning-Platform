@@ -14,7 +14,8 @@ from starlette.exceptions import HTTPException
 
 from app.config import Settings
 from app.database import create_runtime_engine, database_is_ready, expected_migration_heads
-from app.errors import Problem, problem_response
+from app.errors import Problem, ProblemException, problem_response
+from app.identity.learner_routes import router as learner_router
 from app.identity.routes import router as identity_router
 
 access_log = logging.getLogger("app.access")
@@ -46,6 +47,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(identity_router)
+app.include_router(learner_router)
 
 
 def request_id(header: str) -> str:
@@ -85,6 +87,8 @@ async def correlate_requests(
 
 @app.exception_handler(HTTPException)
 async def handle_http_exception(request: Request, error: HTTPException) -> Response:
+    if isinstance(error, ProblemException):
+        return problem_response(request, error.status_code, error.code, error.detail)
     return problem_response(
         request,
         error.status_code,
