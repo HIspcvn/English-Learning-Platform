@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 import { LearnerEntry } from "@/features/auth/learner-entry";
 import { LogoutForm } from "@/features/auth/logout-form";
-import { AuthHeading, AuthShell } from "@/features/auth/shell";
+import { AuthHeading, AuthShell, authLink } from "@/features/auth/shell";
 
 export const metadata: Metadata = { title: "Tài khoản của bạn | Nhịp Anh" };
 
@@ -52,6 +52,7 @@ export default function DashboardPage() {
                   <dd className="mt-1 font-medium">{user.locale === "en" ? <span lang="en">English</span> : "Tiếng Việt"}</dd>
                 </div>
               </dl>
+              <a className={`${authLink} mt-3 inline-flex min-h-11 items-center`} href="/settings">Cài đặt tài khoản</a>
             </section>
           </div>
         </AuthShell>
